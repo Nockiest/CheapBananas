@@ -11,7 +11,8 @@ pub async fn add_shop(pool: &PgPool, name: &str) -> Result<Uuid, sqlx::Error> {
 
 pub async fn add_product(pool: &PgPool, product: &Product) -> Result<Uuid, sqlx::Error> {
     let product = sqlx::query!(
-        "INSERT INTO products (name, price, product_volume, unit, shop_id, date, notes, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        "INSERT INTO products (id, name, price, product_volume, unit, shop_id, date, notes, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+        product.id,
         product.name,
         product.price,
         product.product_volume,
@@ -45,53 +46,56 @@ pub async fn delete_shop(pool: &PgPool, shop_id: Uuid) -> Result<u64, sqlx::Erro
     .await?;
     Ok(result.rows_affected())
 }
+
+// Filter struct for get_products_filtered
+#[derive(Default)]
+pub struct ProductFilter<'a> {
+    pub name: Option<&'a str>,
+    pub unit: Option<&'a str>,
+    pub min_price: Option<f64>,
+    pub max_price: Option<f64>,
+    pub shop_id: Option<Uuid>,
+    pub date: Option<chrono::NaiveDateTime>,
+    pub notes: Option<&'a str>,
+    pub tag: Option<&'a str>,
+}
+
 pub async fn get_products_filtered(
     pool: &PgPool,
-    name: Option<&str>,
-    unit: Option<&str>,
-    min_price: Option<f64>,
-    max_price: Option<f64>,
-    shop_id: Option<Uuid>,
-    date: Option<chrono::NaiveDateTime>,
-    notes: Option<&str>,
-    tag: Option<&str>, // single tag filter (for simplicity)
+    filter: ProductFilter<'_>,
 ) -> Result<Vec<Product>, sqlx::Error> {
     use sqlx::QueryBuilder;
     let mut builder = QueryBuilder::new(
         "SELECT id, name, price, product_volume, unit, shop_id, date, notes, tags FROM products WHERE 1=1"
     );
-
-    if let Some(n) = name {
+    if let Some(n) = filter.name {
         builder.push(" AND name = ").push_bind(n);
     }
-    if let Some(u) = unit {
+    if let Some(u) = filter.unit {
         builder.push(" AND unit = ").push_bind(u);
     }
-    if let Some(min) = min_price {
+    if let Some(min) = filter.min_price {
         builder.push(" AND price >= ").push_bind(min);
     }
-    if let Some(max) = max_price {
+    if let Some(max) = filter.max_price {
         builder.push(" AND price <= ").push_bind(max);
     }
-    if let Some(sid) = shop_id {
+    if let Some(sid) = filter.shop_id {
         builder.push(" AND shop_id = ").push_bind(sid);
     }
-    if let Some(d) = date {
+    if let Some(d) = filter.date {
         builder.push(" AND date = ").push_bind(d);
     }
-    if let Some(n) = notes {
+    if let Some(n) = filter.notes {
         builder.push(" AND notes = ").push_bind(n);
     }
-    if let Some(t) = tag {
+    if let Some(t) = filter.tag {
         builder.push(" AND $1 = ANY(tags)").push_bind(t);
     }
-
     let query = builder.build_query_as::<Product>();
     let products = query.fetch_all(pool).await?;
     Ok(products)
 }
-
-
 
 pub async fn get_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
     let products: Vec<Product> = sqlx::query_as::<_, Product>(

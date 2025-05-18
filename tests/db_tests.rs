@@ -136,16 +136,39 @@ async fn test_get_products_filtered() {
     for p in &products {
         add_product(&pool, p).await.expect("Failed to add product");
     }
-    let filtered = get_products_filtered(&pool, Some("Apple"), None, None, None)
-        .await.expect("Failed to filter by name");
+    use backend::db::ProductFilter;
+    let filtered = get_products_filtered(
+        &pool,
+        ProductFilter {
+            name: Some("Apple"),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("Failed to filter by name");
     assert_eq!(filtered.len(), 1);
     assert_eq!(filtered[0].name, "Apple");
-    let filtered = get_products_filtered(&pool, None, Some("l"), None, None)
-        .await.expect("Failed to filter by unit");
+    let filtered = get_products_filtered(
+        &pool,
+        ProductFilter {
+            unit: Some("l"),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("Failed to filter by unit");
     assert_eq!(filtered.len(), 1);
     assert_eq!(filtered[0].name, "Milk");
-    let filtered = get_products_filtered(&pool, None, None, Some(1.5), Some(3.0))
-        .await.expect("Failed to filter by price range");
+    let filtered = get_products_filtered(
+        &pool,
+        ProductFilter {
+            min_price: Some(1.5),
+            max_price: Some(3.0),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("Failed to filter by price range");
     assert_eq!(filtered.len(), 2);
     let names: Vec<_> = filtered.iter().map(|p| p.name.as_str()).collect();
     assert!(names.contains(&"Banana"));

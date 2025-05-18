@@ -115,11 +115,13 @@ dependencies = [
  "bigdecimal",
  "chrono",
  "dotenv",
+ "hyper",
  "serde",
  "serde_json",
  "serial_test",
  "sqlx",
  "tokio",
+ "tower",
  "uuid",
 ]
 
