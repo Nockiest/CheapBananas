@@ -1,7 +1,10 @@
 mod models;
+mod db;
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 use crate::models::{Product, Shop};
+use crate::db::{add_shop, add_product};
+
 async fn get_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
     let products: Vec<Product> = sqlx::query_as::<_, Product>(
         "SELECT id, name, price, product_volume, unit, shop_id, date, notes, tags FROM products",
@@ -11,29 +14,6 @@ async fn get_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
     Ok(products)
 }
 
-async fn add_shop(pool: &PgPool, name: &str) -> Result<Uuid, sqlx::Error> {
-    let shop = sqlx::query!("INSERT INTO shops (name) VALUES ($1) RETURNING id", name)
-        .fetch_one(pool)
-        .await?;
-    Ok(shop.id)
-}
-
-async fn add_product(pool: &PgPool, product: &Product) -> Result<Uuid, sqlx::Error> {
-    let product = sqlx::query!(
-        "INSERT INTO products (name, price, product_volume, unit, shop_id, date, notes, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
-        product.name,
-        product.price,
-        product.product_volume,
-    product.unit.to_string(), // <-- Fix: convert enum to i32
-        product.shop_id,
-        product.date,
-        product.notes,
-        product.tags.as_deref() // <-- Fix: convert Option<Vec<String>> to Option<&[String]>
-    )
-    .fetch_one(pool)
-    .await?;
-    Ok(product.id)
-}
 // Example main with tokio runtime
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
