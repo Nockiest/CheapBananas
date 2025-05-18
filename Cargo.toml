@@ -13,3 +13,7 @@ serde = { version = "1.0", features = ["derive"]}
 bigdecimal = "0.4"
 uuid = { version = "1", features = ["serde", "v4"] }
 serial_test = "3.2.0"
+
+[lib]
+name = "backend"
+path = "src/lib.rs"

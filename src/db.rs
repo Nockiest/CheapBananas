@@ -75,6 +75,15 @@ pub async fn get_products_filtered(
         .await?;
     Ok(products)
 }
+pub async fn get_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
+    let products: Vec<Product> = sqlx::query_as::<_, Product>(
+        "SELECT id, name, price, product_volume, unit, shop_id, date, notes, tags FROM products",
+    )
+    .fetch_all(pool)
+    .await?;
+    Ok(products)
+}
+
 
 pub async fn update_product(
     pool: &PgPool,
