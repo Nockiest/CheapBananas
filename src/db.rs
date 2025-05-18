@@ -45,36 +45,54 @@ pub async fn delete_shop(pool: &PgPool, shop_id: Uuid) -> Result<u64, sqlx::Erro
     .await?;
     Ok(result.rows_affected())
 }
-
 pub async fn get_products_filtered(
     pool: &PgPool,
     name: Option<&str>,
     unit: Option<&str>,
     min_price: Option<f64>,
     max_price: Option<f64>,
+    shop_id: Option<Uuid>,
+    date: Option<chrono::NaiveDateTime>,
+    notes: Option<&str>,
+    tag: Option<&str>, // single tag filter (for simplicity)
 ) -> Result<Vec<Product>, sqlx::Error> {
-    let mut query = String::from("SELECT id, name, price, product_volume, unit, shop_id, date, notes, tags FROM products WHERE 1=1");
-    if name.is_some() {
-        query.push_str(" AND name = $1");
+    use sqlx::QueryBuilder;
+    let mut builder = QueryBuilder::new(
+        "SELECT id, name, price, product_volume, unit, shop_id, date, notes, tags FROM products WHERE 1=1"
+    );
+
+    if let Some(n) = name {
+        builder.push(" AND name = ").push_bind(n);
     }
-    if unit.is_some() {
-        query.push_str(" AND unit = $2");
+    if let Some(u) = unit {
+        builder.push(" AND unit = ").push_bind(u);
     }
-    if min_price.is_some() {
-        query.push_str(" AND price >= $3");
+    if let Some(min) = min_price {
+        builder.push(" AND price >= ").push_bind(min);
     }
-    if max_price.is_some() {
-        query.push_str(" AND price <= $4");
+    if let Some(max) = max_price {
+        builder.push(" AND price <= ").push_bind(max);
     }
-    let products = sqlx::query_as::<_, Product>(&query)
-        .bind(name)
-        .bind(unit)
-        .bind(min_price)
-        .bind(max_price)
-        .fetch_all(pool)
-        .await?;
+    if let Some(sid) = shop_id {
+        builder.push(" AND shop_id = ").push_bind(sid);
+    }
+    if let Some(d) = date {
+        builder.push(" AND date = ").push_bind(d);
+    }
+    if let Some(n) = notes {
+        builder.push(" AND notes = ").push_bind(n);
+    }
+    if let Some(t) = tag {
+        builder.push(" AND $1 = ANY(tags)").push_bind(t);
+    }
+
+    let query = builder.build_query_as::<Product>();
+    let products = query.fetch_all(pool).await?;
     Ok(products)
 }
+
+
+
 pub async fn get_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
     let products: Vec<Product> = sqlx::query_as::<_, Product>(
         "SELECT id, name, price, product_volume, unit, shop_id, date, notes, tags FROM products",

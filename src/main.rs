@@ -5,6 +5,14 @@ use uuid::Uuid;
 use crate::models::{Product, Shop};
 use crate::db::{add_shop, add_product, get_products};
 use serde_json::json;
+use axum::{
+    extract::{Path, State},
+    routing::{get, post, put, delete},
+    Router, Json,
+};
+use std::sync::Arc;
+use tokio::net::TcpListener;
+use axum::serve;
 
 //handle post request
 async fn handle_post_request(pool: &PgPool, request: &str) -> (u16, String) {
@@ -69,8 +77,12 @@ async fn handle_put_request(pool: &PgPool, id: &str, request: &str) -> (u16, Str
                 .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").ok());
             let notes = update.get("notes").and_then(|v| v.as_str());
             let tags_vec = update.get("tags")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>());
+                .and_then(|v| v.as_array()
+                    .and_then(|arr| {
+                        let collected: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+                        if collected.is_empty() { None } else { Some(collected) }
+                    })
+                );
             let tags = tags_vec.as_deref();
             match db::update_product(
                 pool, uuid,
@@ -99,31 +111,61 @@ async fn handle_delete_request(pool: &PgPool, id: &str) -> (u16, String) {
         Err(e) => (400, json!({"error": format!("Invalid UUID: {}", e)}).to_string()),
     }
 }
-// Example main with tokio runtime
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
     dotenv::dotenv().ok();
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = PgPool::connect(&database_url).await?;
-    let shop_id: Uuid = add_shop(&pool, "Test Shop").await?;
-    let test_product: Product = Product {
-        id: Uuid::new_v4(),
-        name: "Test Product".to_string(),
-        price: 10.0,
-        product_volume: Some(1.0),
-        unit: models::Unit::Kg, // <-- Use enum variant
-        shop_id: Some(shop_id),
-        date: None, // Uncomment and set if needed
-        notes: Some("Test notes".to_string()),
-        tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
-    };
+    let shared_pool = Arc::new(pool);
 
-    add_product(&pool, &test_product).await?;
+    let app = Router::new()
+        .route("/products", post(axum_post_product).get(axum_get_all_products))
+        // .route("/products/:id", get(axum_get_product).put(axum_put_product).delete(axum_delete_product))
+        .with_state(shared_pool.clone())
+        .without_v07_checks();
 
-    let products = get_products(&pool).await?;
-    for product in products {
-        println!("{:?}", product);
-    }
-
+    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    serve(listener, app).await.unwrap();
     Ok(())
+}
+
+// Axum handler wrappers
+async fn axum_post_product(
+    State(pool): State<Arc<PgPool>>,
+    Json(payload): Json<serde_json::Value>,
+) -> (axum::http::StatusCode, String) {
+    let (code, body) = handle_post_request(&pool, &payload.to_string()).await;
+    (axum::http::StatusCode::from_u16(code).unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR), body)
+}
+
+async fn axum_get_product(
+    State(pool): State<Arc<PgPool>>,
+    Path(id): Path<String>,
+) -> (axum::http::StatusCode, String) {
+    let (code, body) = handle_get_request(&pool, &id).await;
+    (axum::http::StatusCode::from_u16(code).unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR), body)
+}
+
+async fn axum_get_all_products(
+    State(pool): State<Arc<PgPool>>,
+) -> (axum::http::StatusCode, String) {
+    let (code, body) = handle_get_all_request(&pool).await;
+    (axum::http::StatusCode::from_u16(code).unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR), body)
+}
+
+async fn axum_put_product(
+    State(pool): State<Arc<PgPool>>,
+    Path(id): Path<String>,
+    Json(payload): Json<serde_json::Value>,
+) -> (axum::http::StatusCode, String) {
+    let (code, body) = handle_put_request(&pool, &id, &payload.to_string()).await;
+    (axum::http::StatusCode::from_u16(code).unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR), body)
+}
+
+async fn axum_delete_product(
+    State(pool): State<Arc<PgPool>>,
+    Path(id): Path<String>,
+) -> (axum::http::StatusCode, String) {
+    let (code, body) = handle_delete_request(&pool, &id).await;
+    (axum::http::StatusCode::from_u16(code).unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR), body)
 }
