@@ -220,4 +220,69 @@ mod tests {
         assert!(names.contains(&"Banana"));
         assert!(names.contains(&"Milk"));
     }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_update_product_edge_cases() {
+        let pool = setup_db().await;
+        let shop_id = add_shop(&pool, "Update Shop").await.expect("Failed to add shop");
+        let test_product = Product {
+            id: Uuid::new_v4(),
+            name: "EdgeCaseProduct".to_string(),
+            price: 10.0,
+            product_volume: Some(1.0),
+            unit: crate::models::Unit::Kg,
+            shop_id: Some(shop_id),
+            date: None,
+            notes: Some("Initial notes".to_string()),
+            tags: Some(vec!["tag1".to_string()]),
+        };
+        let product_id = add_product(&pool, &test_product).await.expect("Failed to add product");
+
+        // 1. Update nothing (should return 0 rows affected)
+        let affected = crate::db::update_product(&pool, product_id, None, None, None, None, None, None, None, None).await.expect("Update nothing");
+        assert_eq!(affected, 0);
+
+        // 2. Update with valid data
+        let affected = crate::db::update_product(
+            &pool, product_id,
+            Some("UpdatedName"), Some(20.0), Some(2.0), Some("l"), Some(shop_id), None, Some("Updated notes"), Some(&["tag2".to_string()]),
+        ).await.expect("Update valid");
+        assert_eq!(affected, 1);
+        let updated = get_products(&pool).await.expect("Get products").into_iter().find(|p| p.id == product_id).unwrap();
+        assert_eq!(updated.name, "UpdatedName");
+        assert_eq!(updated.price, 20.0);
+        assert_eq!(updated.product_volume, Some(2.0));
+        assert_eq!(updated.unit.to_string(), "l");
+        assert_eq!(updated.notes.as_deref(), Some("Updated notes"));
+        assert_eq!(updated.tags, Some(vec!["tag2".to_string()]));
+
+        // 3. Update with empty string for name (should succeed)
+        let affected = crate::db::update_product(&pool, product_id, Some(""), None, None, None, None, None, None, None).await.expect("Update empty name");
+        assert_eq!(affected, 1);
+        let updated = get_products(&pool).await.expect("Get products").into_iter().find(|p| p.id == product_id).unwrap();
+        assert_eq!(updated.name, "");
+
+        // 4. Update with too high price (should error)
+        let err = crate::db::update_product(&pool, product_id, None, Some(10001.0), None, None, None, None, None, None).await;
+        assert!(err.is_err(), "Should error for price out of bounds");
+
+        // 5. Update with too high product_volume (should error)
+        let err = crate::db::update_product(&pool, product_id, None, None, Some(10001.0), None, None, None, None, None).await;
+        assert!(err.is_err(), "Should error for product_volume out of bounds");
+
+        // 6. Update with non-existent shop_id (should error)
+        let fake_shop = Uuid::new_v4();
+        let err = crate::db::update_product(&pool, product_id, None, None, None, None, Some(fake_shop), None, None, None).await;
+        assert!(err.is_err(), "Should error for non-existent shop_id");
+
+        // 7. Update with long name and notes (should succeed)
+        let long_name = "a".repeat(255);
+        let long_notes = "b".repeat(1000);
+        let affected = crate::db::update_product(&pool, product_id, Some(&long_name), None, None, None, None, None, Some(&long_notes), None).await.expect("Update long fields");
+        assert_eq!(affected, 1);
+        let updated = get_products(&pool).await.expect("Get products").into_iter().find(|p| p.id == product_id).unwrap();
+        assert_eq!(updated.name, long_name);
+        assert_eq!(updated.notes.as_deref(), Some(&long_notes[..]));
+    }
 }
