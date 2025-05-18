@@ -1,9 +1,5 @@
 mod models;
-use chrono::{NaiveDateTime};
-use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
-use std::env;
-use bigdecimal::BigDecimal;
 use uuid::Uuid;
 use crate::models::{Product, Shop};
 async fn get_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
