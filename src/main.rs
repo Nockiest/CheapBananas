@@ -1,26 +1,11 @@
+mod models;
 use chrono::{NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
 use std::env;
 use bigdecimal::BigDecimal;
 use uuid::Uuid;
-#[derive(Debug, FromRow, Serialize, Deserialize)]
-struct Product {
-    id: Uuid,
-    name: String,
-    price: f64,
-    product_volume: Option<f64>,
-    shop_id: Option<Uuid>,
-    date: Option<NaiveDateTime>,
-    notes: Option<String>,
-    tags: Option<Vec<String>>,
-}
-
-struct Shop {
-    id: Uuid,
-    name: String,
-    products: Vec<Product>,
-}
+use crate::models::{Product, Shop};
 async fn get_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
     let products: Vec<Product> = sqlx::query_as::<_, Product>(
         "SELECT id, name, price, product_volume, shop_id, date, notes, tags FROM products",
