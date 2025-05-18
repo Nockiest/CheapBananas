@@ -45,3 +45,33 @@ pub async fn delete_shop(pool: &PgPool, shop_id: Uuid) -> Result<u64, sqlx::Erro
     .await?;
     Ok(result.rows_affected())
 }
+
+pub async fn get_products_filtered(
+    pool: &PgPool,
+    name: Option<&str>,
+    unit: Option<&str>,
+    min_price: Option<f64>,
+    max_price: Option<f64>,
+) -> Result<Vec<Product>, sqlx::Error> {
+    let mut query = String::from("SELECT id, name, price, product_volume, unit, shop_id, date, notes, tags FROM products WHERE 1=1");
+    if name.is_some() {
+        query.push_str(" AND name = $1");
+    }
+    if unit.is_some() {
+        query.push_str(" AND unit = $2");
+    }
+    if min_price.is_some() {
+        query.push_str(" AND price >= $3");
+    }
+    if max_price.is_some() {
+        query.push_str(" AND price <= $4");
+    }
+    let products = sqlx::query_as::<_, Product>(&query)
+        .bind(name)
+        .bind(unit)
+        .bind(min_price)
+        .bind(max_price)
+        .fetch_all(pool)
+        .await?;
+    Ok(products)
+}

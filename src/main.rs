@@ -157,4 +157,67 @@ mod tests {
 
         // Optionally, check shop is gone (if you have a get_shops function)
     }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn test_get_products_filtered() {
+        let pool = setup_db().await;
+        let shop_id = add_shop(&pool, "Filter Shop").await.expect("Failed to add shop");
+        // Insert products with different names, units, and prices
+        let products = vec![
+            Product {
+                id: Uuid::new_v4(),
+                name: "Apple".to_string(),
+                price: 1.0,
+                product_volume: Some(1.0),
+                unit: crate::models::Unit::Kg,
+                shop_id: Some(shop_id),
+                date: None,
+                notes: Some("Fresh apples".to_string()),
+                tags: Some(vec!["fruit".to_string()]),
+            },
+            Product {
+                id: Uuid::new_v4(),
+                name: "Banana".to_string(),
+                price: 2.0,
+                product_volume: Some(1.0),
+                unit: crate::models::Unit::Kg,
+                shop_id: Some(shop_id),
+                date: None,
+                notes: Some("Yellow bananas".to_string()),
+                tags: Some(vec!["fruit".to_string()]),
+            },
+            Product {
+                id: Uuid::new_v4(),
+                name: "Milk".to_string(),
+                price: 3.0,
+                product_volume: Some(1.0),
+                unit: crate::models::Unit::L,
+                shop_id: Some(shop_id),
+                date: None,
+                notes: Some("Whole milk".to_string()),
+                tags: Some(vec!["dairy".to_string()]),
+            },
+        ];
+        for p in &products {
+            add_product(&pool, p).await.expect("Failed to add product");
+        }
+        // Filter by name
+        let filtered = crate::db::get_products_filtered(&pool, Some("Apple"), None, None, None)
+            .await.expect("Failed to filter by name");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].name, "Apple");
+        // Filter by unit
+        let filtered = crate::db::get_products_filtered(&pool, None, Some("l"), None, None)
+            .await.expect("Failed to filter by unit");
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].name, "Milk");
+        // Filter by price range
+        let filtered = crate::db::get_products_filtered(&pool, None, None, Some(1.5), Some(3.0))
+            .await.expect("Failed to filter by price range");
+        assert_eq!(filtered.len(), 2);
+        let names: Vec<_> = filtered.iter().map(|p| p.name.as_str()).collect();
+        assert!(names.contains(&"Banana"));
+        assert!(names.contains(&"Milk"));
+    }
 }
