@@ -44,6 +44,7 @@ async fn main() -> Result<(), sqlx::Error> {
 }
 
 #[cfg(test)]
+#[serial_test::serial]
 mod tests {
     use super::*;
     use sqlx::Executor;
@@ -113,5 +114,47 @@ mod tests {
             let products = get_products(&pool).await.expect("Failed to get products");
             assert!(products.iter().any(|p| p.id == product_id && p.unit == unit), "Product with unit {unit:?} should be in DB");
         }
+    }
+
+    #[tokio::test]
+    async fn test_delete_product_and_shop() {
+        let pool = setup_db().await;
+        println!("Database setup complete.");
+
+        // Add a shop
+        let shop_id = add_shop(&pool, "Shop to Delete").await.expect("Failed to add shop");
+        println!("Added shop with id: {}", shop_id);
+
+        // Add a product
+        let test_product = Product {
+            id: Uuid::new_v4(),
+            name: "Product to Delete".to_string(),
+            price: 5.0,
+            product_volume: Some(2.0),
+            unit: crate::models::Unit::Kg,
+            shop_id: Some(shop_id),
+            date: None,
+            notes: Some("To be deleted".to_string()),
+            tags: Some(vec!["delete".to_string()]),
+        };
+        println!("Created test product: {:?}", test_product);
+
+        let product_id: Uuid = add_product(&pool, &test_product).await.expect("Failed to add product");
+        println!("Added product with id: {}", product_id);
+
+        // Delete the product
+        let deleted: u64 = crate::db::delete_product(&pool, product_id).await.expect("Failed to delete product");
+        println!("Deleted {} product(s) with id: {}", deleted, product_id);
+
+        let products = get_products(&pool).await.expect("Failed to get products");
+        println!("Products after deletion: {:?}", products);
+
+        assert!(!products.iter().any(|p| p.id == product_id), "Product should be deleted");
+
+        // Delete the shop
+        let deleted_shop = crate::db::delete_shop(&pool, shop_id).await.expect("Failed to delete shop");
+        println!("Deleted {} shop(s) with id: {}", deleted_shop, shop_id);
+
+        // Optionally, check shop is gone (if you have a get_shops function)
     }
 }

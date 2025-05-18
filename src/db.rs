@@ -25,3 +25,23 @@ pub async fn add_product(pool: &PgPool, product: &Product) -> Result<Uuid, sqlx:
     .await?;
     Ok(product.id)
 }
+
+pub async fn delete_product(pool: &PgPool, product_id: Uuid) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query!(
+        "DELETE FROM products WHERE id = $1",
+        product_id
+    )
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
+
+pub async fn delete_shop(pool: &PgPool, shop_id: Uuid) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query!(
+        "DELETE FROM shops WHERE id = $1",
+        shop_id
+    )
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
