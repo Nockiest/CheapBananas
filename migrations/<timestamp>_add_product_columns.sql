@@ -1,0 +1,5 @@
+ALTER TABLE products
+    ADD COLUMN price DOUBLE PRECISION,
+    ADD COLUMN product_volume DOUBLE PRECISION,
+    ADD COLUMN unit VARCHAR(10),
+    ADD COLUMN shop_id UUID REFERENCES shops(id);

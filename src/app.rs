@@ -45,40 +45,34 @@ pub async fn handle_get_all_request(pool: &PgPool) -> (u16, String) {
 }
 
 pub async fn handle_put_request(pool: &PgPool, id: &str, request: &str) -> (u16, String) {
-    use chrono::NaiveDateTime;
     match Uuid::parse_str(id) {
         Ok(uuid) => {
             let update: serde_json::Value = match serde_json::from_str(request) {
                 Ok(val) => val,
-                Err(e) => return (400, json!({"error": format!("Invalid JSON: {}", e)}).to_string()),
+                Err(e) => return (400, serde_json::json!({"error": format!("Invalid JSON: {}", e)}).to_string()),
             };
             let name = update.get("name").and_then(|v| v.as_str());
-            let price = update.get("price").and_then(|v| v.as_f64());
-            let product_volume = update.get("product_volume").and_then(|v| v.as_f64());
-            let unit = update.get("unit").and_then(|v| v.as_str());
-            let shop_id = update.get("shop_id").and_then(|v| v.as_str()).and_then(|s| Uuid::parse_str(s).ok());
-            let date = update.get("date")
-                .and_then(|v| v.as_str())
-                .and_then(|s| NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S").ok());
             let notes = update.get("notes").and_then(|v| v.as_str());
-            let tags_vec = update.get("tags")
-                .and_then(|v| v.as_array()
-                    .and_then(|arr| {
-                        let collected: Vec<String> = arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
-                        if collected.is_empty() { None } else { Some(collected) }
-                    })
-                );
-            let tags = tags_vec.as_deref();
+            let tags_vec = update.get("tags").and_then(|v| v.as_array().map(|arr| arr.iter().filter_map(|t| t.as_str().map(|s| s.to_string())).collect::<Vec<String>>()));
+            let tags = tags_vec.as_ref().map(|v| v.as_slice());
             match db::update_product(
                 pool, uuid,
-                name, price, product_volume, unit, shop_id, date, notes, tags
+                name,
+                None, None, None, None, None,
+                notes,
+                tags,
             ).await {
-                Ok(affected) if affected > 0 => (200, json!({"updated": affected}).to_string()),
-                Ok(_) => (404, json!({"error": "Product not found"}).to_string()),
-                Err(e) => (500, json!({"error": e.to_string()}).to_string()),
+                Ok(affected) => {
+                    if affected == 0 {
+                        (404, serde_json::json!({"error": "Product not found or nothing to update"}).to_string())
+                    } else {
+                        (200, serde_json::json!({"updated": affected}).to_string())
+                    }
+                },
+                Err(e) => (500, serde_json::json!({"error": e.to_string()}).to_string()),
             }
         },
-        Err(e) => (400, json!({"error": format!("Invalid UUID: {}", e)}).to_string()),
+        Err(e) => (400, serde_json::json!({"error": format!("Invalid UUID: {}", e)}).to_string()),
     }
 }
 

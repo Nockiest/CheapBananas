@@ -1,7 +1,7 @@
 use chrono::NaiveDateTime;
-use uuid::Uuid;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, Type};
+use uuid::Uuid;
 
 #[derive(Debug, Type, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 #[sqlx(type_name = "TEXT")]
@@ -33,17 +33,30 @@ impl fmt::Display for Unit {
 pub struct Product {
     pub id: Uuid,
     pub name: String,
+    pub notes: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
+// ...existing code...
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct ProductEntry {
+    pub id: Uuid,
+    pub product_id: Uuid,
     pub price: f64,
     pub product_volume: Option<f64>,
     pub unit: Unit,
     pub shop_id: Option<Uuid>,
     pub date: Option<NaiveDateTime>,
     pub notes: Option<String>,
-    pub tags: Option<Vec<String>>,
 }
 
+#[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct Shop {
     pub id: Uuid,
     pub name: String,
-    pub products: Vec<Product>,
+    pub notes: Option<String>,
+    // Removed products field for DB compatibility
 }
+
+// ...existing code...

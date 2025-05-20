@@ -2,13 +2,9 @@ mod models;
 mod db;
 mod app;
 use sqlx::{FromRow, PgPool};
-use uuid::Uuid;
 use crate::models::{Product, Shop};
-use crate::db::{add_shop, add_product, get_products};
-use serde_json::json;
 use axum::{
     extract::{Path, State},
-    routing::{get, post, put, delete},
     Router, Json,
 };
 use std::sync::Arc;
