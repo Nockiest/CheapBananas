@@ -21,7 +21,7 @@ pub async fn add_product(pool: &PgPool, product: &Product) -> Result<Uuid, sqlx:
     .await?;
     Ok(product.id)
 }
-
+//
 pub async fn add_product_entry(pool: &PgPool, entry: &ProductEntry) -> Result<Uuid, sqlx::Error> {
     let row = sqlx::query!(
         "INSERT INTO product_entries (id, product_id, price, product_volume, unit, shop_id, date, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
