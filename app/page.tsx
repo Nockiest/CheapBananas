@@ -1,16 +1,18 @@
 "use client";
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './styles';
+import { UNIT_CONVERSIONS, normalizeUnit, normalizePricePerPiece } from './unitConversion';
+
 const MODES = [
 	{
 		key: 'productEntry',
 		label: 'Product Entry',
 		fields: [
-			{ label: 'Product ID', required: true, suggestions: [] },
+			{ label: 'Product Name', required: true, suggestions: ['banana', 'bread', 'butter', 'beans'] },
 			{ label: 'Price', required: true, suggestions: [] },
 			{ label: 'Product Volume', required: false, suggestions: [] },
 			{ label: 'Unit', required: true, suggestions: ['kg', 'l', 'ks'] },
-			{ label: 'Shop ID', required: false, suggestions: ['tesco', 'lidl', 'albert', 'billa'] },
+			{ label: 'Shop Name', required: false, suggestions: ['tesco', 'lidl', 'albert', 'billa'] },
 			{ label: 'Date', required: false, suggestions: [] },
 			{ label: 'Notes', required: false, suggestions: [] },
 		],
@@ -45,6 +47,7 @@ export default function HomePage() {
 	);
 	const [activeSuggestion, setActiveSuggestion] = useState(Array(currentMode.fields.length).fill(null));
 	const abortControllers = useRef(Array(currentMode.fields.length).fill(null));
+	const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
 	useEffect(() => {
 		setSuggestions(currentMode.fields.map(f => f.suggestions));
@@ -127,38 +130,37 @@ export default function HomePage() {
 	const handleSend = async () => {
 		try {
 			let entryValues = [...values];
-			if (mode === 'productEntry') {
-				// Add date if not provided (default to today)
-				if (!entryValues[5] || entryValues[5] === '') {
-					const today = new Date();
-					const yyyy = today.getFullYear();
-					const mm = String(today.getMonth() + 1).padStart(2, '0');
-					const dd = String(today.getDate()).padStart(2, '0');
-					entryValues[5] = `${yyyy}-${mm}-${dd}`;
-				}
-			}
-			// Send to Rust backend (Axum, port 4000)
 			let endpoint = '';
 			let body: any = {};
 			let baseUrl = 'http://localhost:4000';
 			if (mode === 'product') {
 				endpoint = '/products';
+				// The backend expects a Product struct, which requires an id field.
+				// We'll generate a UUID here and send it as part of the product object.
+				// You can use the uuid library for this:
+				// npm install uuid
+				// import { v4 as uuidv4 } from 'uuid';
+				// For now, use a simple UUID generator:
+				const uuid = URL.createObjectURL(new Blob()).split('/').pop();
 				body = {
+					id: uuid,
 					name: entryValues[0],
 					notes: entryValues[1] || undefined,
 					tags: entryValues[2] ? entryValues[2].split(',').map((t: string) => t.trim()) : undefined,
 				};
 			} else if (mode === 'productEntry') {
-				endpoint = '/product-entries';
+				// Add a unique id for the product entry
+				const id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 				body = {
-					product_id: entryValues[0],
-					price: parseFloat(entryValues[1]),
-					product_volume: entryValues[2] ? parseFloat(entryValues[2]) : undefined,
+					id,
+					product_name: entryValues[0],
+					price: entryValues[1],
+					product_volume: entryValues[2] || undefined,
 					unit: entryValues[3],
-					shop_id: entryValues[4] || undefined,
-					date: entryValues[5],
+					shop_name: entryValues[4] || undefined,
 					notes: entryValues[6] || undefined,
 				};
+				endpoint = '/product-entries';
 			} else if (mode === 'shop') {
 				endpoint = '/shops';
 				body = {
@@ -171,13 +173,18 @@ export default function HomePage() {
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify(body),
 			});
-			if (!res.ok) throw new Error('Failed to send');
+			if (!res.ok) {
+				const errText = await res.text();
+				throw new Error(errText || 'Failed to send');
+			}
 			setSuccess(true);
 			setSentEntry(entryValues);
 			setText('');
-		} catch (e) {
+			setErrorMsg(null);
+		} catch (e: any) {
 			setSuccess(false);
 			setSentEntry(null);
+			setErrorMsg(e?.message || 'Failed to send');
 		}
 	};
 
@@ -251,6 +258,9 @@ export default function HomePage() {
 						Sent values: [{sentEntry.map((v, i) => `${currentMode.fields[i]?.label || 'Extra'}: ${v}`).join(', ')}]
 					</span>
 				</div>
+			)}
+			{errorMsg && (
+				<div style={{ color: 'red', fontSize: 16, margin: '8px 0', textAlign: 'center' }}>{errorMsg}</div>
 			)}
 			<button
 				onClick={handleSend}
