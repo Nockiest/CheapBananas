@@ -60,16 +60,26 @@ pub struct Shop {
 // Filter struct for get_products_filtered
 #[derive(Default, Debug, Deserialize)]
 pub struct ProductFilter<'a> {
+    // Product fields
     pub id: Option<Uuid>,
     pub name: Option<&'a str>,
-    pub unit: Option<&'a str>,
-    pub min_price: Option<f64>,
-    pub max_price: Option<f64>,
-    pub shop_id: Option<Uuid>,
-    pub date: Option<chrono::NaiveDateTime>,
     pub notes: Option<&'a str>,
     pub tag: Option<&'a str>,
-    pub product_id: Option<Uuid>, // for product entries
+    // ProductEntry fields
+    pub product_id: Option<Uuid>,
+    pub min_price: Option<f64>,
+    pub max_price: Option<f64>,
+    pub product_volume: Option<f64>,
+    pub unit: Option<&'a str>,
+    pub shop_id: Option<Uuid>,
+    pub date: Option<chrono::NaiveDateTime>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+pub struct ShopFilter<'a> {
+    pub id: Option<Uuid>,
+    pub name: Option<&'a str>,
+    pub notes: Option<&'a str>,
 }
 
 pub type ProductEntryFilter<'a> = ProductFilter<'a>;

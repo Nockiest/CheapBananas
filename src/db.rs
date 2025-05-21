@@ -200,3 +200,25 @@ pub async fn update_product(
     let result = query.execute(pool).await?;
     Ok(result.rows_affected())
 }
+
+pub async fn get_shops_filtered(
+    pool: &PgPool,
+    filter: crate::models::ShopFilter<'_>,
+) -> Result<Vec<crate::models::Shop>, sqlx::Error> {
+    use sqlx::QueryBuilder;
+    let mut builder = QueryBuilder::new(
+        "SELECT id, name, notes FROM shops WHERE 1=1"
+    );
+    if let Some(id) = filter.id {
+        builder.push(" AND id = ").push_bind(id);
+    }
+    if let Some(name) = filter.name {
+        builder.push(" AND name = ").push_bind(name);
+    }
+    if let Some(notes) = filter.notes {
+        builder.push(" AND notes = ").push_bind(notes);
+    }
+    let query = builder.build_query_as::<crate::models::Shop>();
+    let shops = query.fetch_all(pool).await?;
+    Ok(shops)
+}

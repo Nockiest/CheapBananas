@@ -370,3 +370,66 @@ async fn test_get_product_entries_filtered_endpoint() {
     assert_eq!(filtered.len(), 1);
     assert_eq!(filtered[0]["notes"], "Fresh batch");
 }
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_get_shops_filtered_endpoint() {
+    use axum::body::Body;
+    use axum::http::Request;
+    use tower::ServiceExt;
+    use std::sync::Arc;
+    use backend::app::build_app_router;
+
+    let pool = setup_db().await;
+    let shared_pool = Arc::new(pool.clone());
+    let app = build_app_router(shared_pool.clone());
+
+    // Add shops
+    let shop1_id = add_shop(&pool, "Tesco").await.expect("Failed to add shop");
+    let shop2_id = add_shop(&pool, "Lidl").await.expect("Failed to add shop");
+    let shop3_id = add_shop(&pool, "Tesco Express").await.expect("Failed to add shop");
+    // Update notes for shop3
+    sqlx::query!("UPDATE shops SET notes = $1 WHERE id = $2", Some("small"), shop3_id)
+        .execute(&pool).await.expect("Failed to update notes");
+
+    // Filter by name
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri("/shops/filter?name=Tesco")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert!(filtered.iter().any(|s| s["name"] == "Tesco"));
+    assert!(filtered.iter().any(|s| s["name"] == "Tesco Express"));
+
+    // Filter by id
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri(&format!("/shops/filter?id={}", shop2_id))
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0]["name"], "Lidl");
+
+    // Filter by notes
+    let response = app
+        .oneshot(Request::builder()
+            .uri("/shops/filter?notes=small")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0]["name"], "Tesco Express");
+}
