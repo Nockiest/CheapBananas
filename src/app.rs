@@ -9,19 +9,29 @@ use serde::Deserialize;
 use serde_json::json;
 use sqlx::PgPool;
 use std::sync::Arc;
+use tower_http::cors::{CorsLayer, Any};
 use uuid::Uuid;
 
 // --- Handler logic ---
 pub async fn handle_post_request(pool: &PgPool, request: &str) -> (u16, String) {
     match serde_json::from_str::<Product>(request) {
-        Ok(product) => match db::add_product(pool, &product).await {
-            Ok(id) => (201, json!({"id": id}).to_string()),
-            Err(e) => (500, json!({"error": e.to_string()}).to_string()),
+        Ok(product) => {
+            println!("[INFO] Received product POST: {:?}", product);
+            match db::add_product(pool, &product).await {
+                Ok(id) => {
+                    println!("[INFO] Product added to DB with id: {}", id);
+                    (201, json!({"id": id}).to_string())
+                },
+                Err(e) => {
+                    println!("[ERROR] Failed to add product: {}", e);
+                    (500, json!({"error": e.to_string()}).to_string())
+                },
+            }
         },
-        Err(e) => (
-            400,
-            json!({"error": format!("Invalid JSON: {}", e)}).to_string(),
-        ),
+        Err(e) => {
+            println!("[ERROR] Invalid product JSON: {}", e);
+            (400, json!({"error": format!("Invalid JSON: {}", e)}).to_string())
+        },
     }
 }
 
@@ -112,15 +122,63 @@ pub async fn handle_delete_request(pool: &PgPool, id: &str) -> (u16, String) {
 }
 
 pub async fn handle_post_product_entry(pool: &PgPool, request: &str) -> (u16, String) {
-    match serde_json::from_str::<ProductEntry>(request) {
-        Ok(entry) => match db::add_product_entry(pool, &entry).await {
-            Ok(id) => (201, json!({"id": id}).to_string()),
-            Err(e) => (500, json!({"error": e.to_string()}).to_string()),
+    use crate::models::ProductEntry;
+    use crate::db;
+    use serde_json::Value;
+    println!("[INFO] Incoming product entry POST body: {}", request);
+    match serde_json::from_str::<Value>(request) {
+        Ok(mut entry_val) => {
+            println!("[DEBUG] Parsed JSON for product entry: {:?}", entry_val);
+            // Try to resolve product_name to product_id before any further validation
+            let product_name = entry_val.get("product_name").and_then(|v| v.as_str());
+            if product_name.is_none() {
+                println!("[ERROR] Missing product_name in product entry JSON");
+                return (400, json!({"error": "Missing product_name in product entry"}).to_string());
+            }
+            println!("[INFO] Looking up product by name: {}", product_name.unwrap());
+            match db::get_product_by_name(pool, product_name.unwrap()).await {
+                Ok(Some(product)) => {
+                    let product_id = product.id;
+                    println!("[INFO] Found product id {} for name {}", product_id, product_name.unwrap());
+                    let mut entry_map = entry_val.as_object().unwrap().clone();
+                    entry_map.insert("product_id".to_string(), serde_json::json!(product_id));
+                    // Remove product_name (optional, if ProductEntry expects product_id only)
+                    // entry_map.remove("product_name");
+                    // Now try to deserialize to ProductEntry (this will check formatting)
+                    match serde_json::from_value::<ProductEntry>(serde_json::Value::Object(entry_map)) {
+                        Ok(entry) => {
+                            println!("[INFO] Received product entry POST (fully formed): {:?}", entry);
+                            match db::add_product_entry(pool, &entry).await {
+                                Ok(id) => {
+                                    println!("[INFO] Product entry added to DB with id: {}", id);
+                                    (201, json!({"id": id}).to_string())
+                                },
+                                Err(e) => {
+                                    println!("[ERROR] Failed to add product entry: {}", e);
+                                    (500, json!({"error": e.to_string()}).to_string())
+                                },
+                            }
+                        },
+                        Err(e) => {
+                            println!("[ERROR] Invalid product entry JSON after adding product_id: {}", e);
+                            (400, json!({"error": format!("Invalid product entry: {}", e)}).to_string())
+                        }
+                    }
+                },
+                Ok(None) => {
+                    println!("[ERROR] No product found with name: {}", product_name.unwrap());
+                    (400, json!({"error": format!("No product found with name: {}", product_name.unwrap())}).to_string())
+                },
+                Err(e) => {
+                    println!("[ERROR] DB error looking up product by name: {}", e);
+                    (500, json!({"error": e.to_string()}).to_string())
+                }
+            }
         },
-        Err(e) => (
-            400,
-            json!({"error": format!("Invalid JSON: {}", e)}).to_string(),
-        ),
+        Err(e) => {
+            println!("[ERROR] Invalid product entry JSON: {}", e);
+            (400, json!({"error": format!("Invalid JSON: {}", e)}).to_string())
+        },
     }
 }
 
@@ -203,20 +261,32 @@ pub async fn axum_post_shop(
 ) -> (axum::http::StatusCode, String) {
     let name = payload.get("name").and_then(|v| v.as_str());
     match name {
-        Some(name) => match db::add_shop(&pool, name).await {
-            Ok(id) => (
-                axum::http::StatusCode::CREATED,
-                serde_json::json!({"id": id}).to_string(),
-            ),
-            Err(e) => (
-                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                serde_json::json!({"error": e.to_string()}).to_string(),
-            ),
+        Some(name) => {
+            println!("[INFO] Received shop POST: name={}", name);
+            match db::add_shop(&pool, name).await {
+                Ok(id) => {
+                    println!("[INFO] Shop added to DB with id: {}", id);
+                    (
+                        axum::http::StatusCode::CREATED,
+                        serde_json::json!({"id": id}).to_string(),
+                    )
+                },
+                Err(e) => {
+                    println!("[ERROR] Failed to add shop: {}", e);
+                    (
+                        axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        serde_json::json!({"error": e.to_string()}).to_string(),
+                    )
+                },
+            }
         },
-        None => (
-            axum::http::StatusCode::BAD_REQUEST,
-            serde_json::json!({"error": "Missing 'name' field"}).to_string(),
-        ),
+        None => {
+            println!("[ERROR] Missing 'name' field in shop POST");
+            (
+                axum::http::StatusCode::BAD_REQUEST,
+                serde_json::json!({"error": "Missing 'name' field"}).to_string(),
+            )
+        },
     }
 }
 
@@ -369,5 +439,11 @@ pub fn build_app_router(shared_pool: Arc<PgPool>) -> Router {
             get(axum_get_product_entries_filtered),
         )
         .route("/shops/filter", get(axum_get_shops_filtered))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any)
+        )
         .with_state(shared_pool)
 }

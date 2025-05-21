@@ -222,3 +222,13 @@ pub async fn get_shops_filtered(
     let shops = query.fetch_all(pool).await?;
     Ok(shops)
 }
+
+pub async fn get_product_by_name(pool: &PgPool, name: &str) -> Result<Option<Product>, sqlx::Error> {
+    let product = sqlx::query_as::<_, Product>(
+        "SELECT id, name, notes, tags FROM products WHERE name = $1 LIMIT 1",
+    )
+    .bind(name)
+    .fetch_optional(pool)
+    .await?;
+    Ok(product)
+}

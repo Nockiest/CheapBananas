@@ -20,7 +20,7 @@ async fn main() -> Result<(), sqlx::Error> {
 
     let app = app::build_app_router(shared_pool.clone());
 
-    let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:4000").await.unwrap();
     serve(listener, app).await.unwrap();
     Ok(())
 }
