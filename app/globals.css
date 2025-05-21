@@ -24,3 +24,7 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+input::placeholder {
+  color: #222 !important;
+  opacity: 1;
+}
