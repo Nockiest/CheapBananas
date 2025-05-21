@@ -14,6 +14,7 @@ const MODES = [
 			{ label: 'Product Volume', required: false, suggestions: [] },
 			{ label: 'Unit', required: true, suggestions: ['kg', 'l', 'ks'] },
 			{ label: 'Shop Name', required: true, suggestions: ['tesco', 'lidl', 'albert', 'billa'] }, // Make Shop Name required
+			{ label: 'Tags', required: false, suggestions: [] },
 			{ label: 'Notes', required: false, suggestions: [] },
 			{ label: 'Date', required: false, suggestions: [] },
 		],
@@ -163,8 +164,9 @@ export default function HomePage() {
 					product_volume: normalized.value ? Number(normalized.value) : undefined,
 					unit: normalized.unit,
 					shop_name: entryValues[4] || undefined, // always send as shop_name
-					notes: entryValues[5] || undefined,
-					date: entryValues[6] || undefined,
+					tags: entryValues[5] ? entryValues[5].split(',').map((t: string) => t.trim()) : undefined,
+					notes: entryValues[6] || undefined,
+					date: entryValues[7] || undefined,
 				};
 				endpoint = '/product-entries';
 			} else if (mode === 'shop') {
