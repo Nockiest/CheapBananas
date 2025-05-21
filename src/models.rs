@@ -37,8 +37,6 @@ pub struct Product {
     pub tags: Option<Vec<String>>,
 }
 
-// ...existing code...
-
 #[derive(Debug, FromRow, Serialize, Deserialize)]
 pub struct ProductEntry {
     pub id: Uuid,
@@ -59,4 +57,19 @@ pub struct Shop {
     // Removed products field for DB compatibility
 }
 
-// ...existing code...
+// Filter struct for get_products_filtered
+#[derive(Default, Debug, Deserialize)]
+pub struct ProductFilter<'a> {
+    pub id: Option<Uuid>,
+    pub name: Option<&'a str>,
+    pub unit: Option<&'a str>,
+    pub min_price: Option<f64>,
+    pub max_price: Option<f64>,
+    pub shop_id: Option<Uuid>,
+    pub date: Option<chrono::NaiveDateTime>,
+    pub notes: Option<&'a str>,
+    pub tag: Option<&'a str>,
+    pub product_id: Option<Uuid>, // for product entries
+}
+
+pub type ProductEntryFilter<'a> = ProductFilter<'a>;

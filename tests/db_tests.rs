@@ -123,10 +123,250 @@ async fn test_add_product_entry() {
         date: Some(Utc::now().naive_utc()),
         notes: Some("Entry for test".to_string()),
     };
-    // Insert entry (assumes add_product_entry exists)
+    // Insert entry
     let entry_id = backend::add_product_entry(&pool, &entry).await.expect("Failed to add product entry");
     assert_eq!(entry_id, entry.id);
-    // Optionally, fetch and check
+    // Optionally, fetch and check (if get_product_entries exists)
     // let entries = backend::get_product_entries(&pool).await.expect("Failed to get entries");
     // assert!(entries.iter().any(|e| e.id == entry_id));
+}
+#[tokio::test]
+#[serial_test::serial]
+async fn test_get_products_filtered_endpoint() {
+    use axum::body::Body;
+    use axum::http::{Request};
+    use tower::ServiceExt;
+    use std::sync::Arc;
+    use backend::app::build_app_router;
+
+    let pool = setup_db().await;
+    let shared_pool = Arc::new(pool.clone());
+    let app = build_app_router(shared_pool.clone());
+
+    // Add products
+    let _ = add_shop(&pool, "Filter Shop").await.expect("Failed to add shop");
+    let products = vec![
+        Product {
+            id: Uuid::new_v4(),
+            name: "Apple".to_string(),
+            notes: Some("Fresh apples".to_string()),
+            tags: Some(vec!["fruit".to_string()]),
+        },
+        Product {
+            id: Uuid::new_v4(),
+            name: "Banana".to_string(),
+            notes: Some("Yellow bananas".to_string()),
+            tags: Some(vec!["fruit".to_string()]),
+        },
+        Product {
+            id: Uuid::new_v4(),
+            name: "Milk".to_string(),
+            notes: Some("Whole milk".to_string()),
+            tags: Some(vec!["dairy".to_string()]),
+        },
+    ];
+    for p in &products {
+        add_product(&pool, p).await.expect("Failed to add product");
+    }
+
+    // Filter by name
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri("/products/filter?name=Apple")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    println!("[TEST] Response status for name=Apple: {:?}", response.status());
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    println!("[TEST] Response body for name=Apple: {}", String::from_utf8_lossy(&body));
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    println!("[TEST] Filtered products for name=Apple: {:?}", filtered);
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0]["name"], "Apple");
+
+    // Filter by tag
+    let response = app
+        .oneshot(Request::builder()
+            .uri("/products/filter?tag=fruit")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    println!("[TEST] Response status for tag=fruit: {:?}", response.status());
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    println!("[TEST] Response body for tag=fruit: {}", String::from_utf8_lossy(&body));
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    println!("[TEST] Filtered products for tag=fruit: {:?}", filtered);
+    assert_eq!(filtered.len(), 2);
+    let names: Vec<_> = filtered.iter().map(|p| p["name"].as_str().unwrap()).collect();
+    assert!(names.contains(&"Apple"));
+    assert!(names.contains(&"Banana"));
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_get_products_filtered_all_fields() {
+    use axum::body::Body;
+    use axum::http::Request;
+    use tower::ServiceExt;
+    use std::sync::Arc;
+    use backend::app::build_app_router;
+
+    let pool = setup_db().await;
+    let shared_pool = Arc::new(pool.clone());
+    let app = build_app_router(shared_pool.clone());
+
+    // Add a shop and a product entry for future filter support
+    let shop_id = add_shop(&pool, "AllFields Shop").await.expect("Failed to add shop");
+    let product = Product {
+        id: Uuid::new_v4(),
+        name: "TestProductAllFields".to_string(),
+        notes: Some("Notes for all fields".to_string()),
+        tags: Some(vec!["allfields".to_string()]),
+    };
+    add_product(&pool, &product).await.expect("Failed to add product");
+    // Filtering by name (supported)
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri("/products/filter?name=TestProductAllFields")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0]["name"], "TestProductAllFields");
+    // Filtering by notes (supported)
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri("/products/filter?notes=Notes%20for%20all%20fields")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0]["notes"], "Notes for all fields");
+    // Filtering by tag (supported)
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri("/products/filter?tag=allfields")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0]["name"], "TestProductAllFields");
+    // Filtering by unit, shop_id, min_price, max_price, date (not supported in current schema)
+    // These should return all products or be ignored by the filter logic
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri("/products/filter?unit=kg&shop_id=".to_owned() + &shop_id.to_string() + "&min_price=1.0&max_price=10.0&date=2024-01-01")
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    // Since these fields are not supported, the filter should not restrict results
+    assert!(filtered.iter().any(|p| p["name"] == "TestProductAllFields"));
+    // When schema supports these fields, update this test to check for correct filtering
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_get_product_entries_filtered_endpoint() {
+    use axum::body::Body;
+    use axum::http::Request;
+    use tower::ServiceExt;
+    use std::sync::Arc;
+    use backend::app::build_app_router;
+    use backend::models::Unit;
+    use chrono::Utc;
+
+    let pool = setup_db().await;
+    let shared_pool = Arc::new(pool.clone());
+    let app = build_app_router(shared_pool.clone());
+
+    // Add a shop and a product
+    let shop_id = add_shop(&pool, "EntryFilter Shop").await.expect("Failed to add shop");
+    let product = Product {
+        id: Uuid::new_v4(),
+        name: "EntryFilterProduct".to_string(),
+        notes: Some("Entry filter notes".to_string()),
+        tags: Some(vec!["entryfilter".to_string()]),
+    };
+    let product_id = add_product(&pool, &product).await.expect("Failed to add product");
+    // Add product entries
+    let entry1 = ProductEntry {
+        id: Uuid::new_v4(),
+        product_id,
+        price: 5.0,
+        product_volume: Some(1.0),
+        unit: Unit::Kg,
+        shop_id: Some(shop_id),
+        date: Some(Utc::now().naive_utc()),
+        notes: Some("Fresh batch".to_string()),
+    };
+    let entry2 = ProductEntry {
+        id: Uuid::new_v4(),
+        product_id,
+        price: 10.0,
+        product_volume: Some(2.0),
+        unit: Unit::Kg,
+        shop_id: Some(shop_id),
+        date: Some(Utc::now().naive_utc()),
+        notes: Some("Old batch".to_string()),
+    };
+    backend::add_product_entry(&pool, &entry1).await.expect("Failed to add entry1");
+    backend::add_product_entry(&pool, &entry2).await.expect("Failed to add entry2");
+
+    // Filter by product_id
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri(&format!("/product-entries/filter?product_id={}", product_id))
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(filtered.len(), 2);
+    // Filter by min_price
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri(&format!("/product-entries/filter?product_id={}&min_price=6.0", product_id))
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0]["price"], 10.0);
+    // Filter by notes
+    let response = app
+        .clone()
+        .oneshot(Request::builder()
+            .uri(&format!("/product-entries/filter?product_id={}&notes=Fresh%20batch", product_id))
+            .body(Body::empty())
+            .unwrap())
+        .await
+        .unwrap();
+    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
+    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(filtered[0]["notes"], "Fresh batch");
 }

@@ -1,6 +1,6 @@
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::models::{Product, ProductEntry};
+use crate::models::{Product, ProductEntry, ProductFilter};
 
 pub async fn add_shop(pool: &PgPool, name: &str) -> Result<Uuid, sqlx::Error> {
     let shop = sqlx::query!("INSERT INTO shops (name) VALUES ($1) RETURNING id", name)
@@ -59,50 +59,22 @@ pub async fn delete_shop(pool: &PgPool, shop_id: Uuid) -> Result<u64, sqlx::Erro
     Ok(result.rows_affected())
 }
 
-// Filter struct for get_products_filtered
-#[derive(Default)]
-pub struct ProductFilter<'a> {
-    pub name: Option<&'a str>,
-    pub unit: Option<&'a str>,
-    pub min_price: Option<f64>,
-    pub max_price: Option<f64>,
-    pub shop_id: Option<Uuid>,
-    pub date: Option<chrono::NaiveDateTime>,
-    pub notes: Option<&'a str>,
-    pub tag: Option<&'a str>,
-}
-
 pub async fn get_products_filtered(
     pool: &PgPool,
     filter: ProductFilter<'_>,
 ) -> Result<Vec<Product>, sqlx::Error> {
     use sqlx::QueryBuilder;
     let mut builder = QueryBuilder::new(
-        "SELECT id, name, price, product_volume, unit, shop_id, date, notes, tags FROM products WHERE 1=1"
+        "SELECT id, name, notes, tags FROM products WHERE 1=1"
     );
     if let Some(n) = filter.name {
         builder.push(" AND name = ").push_bind(n);
-    }
-    if let Some(u) = filter.unit {
-        builder.push(" AND unit = ").push_bind(u);
-    }
-    if let Some(min) = filter.min_price {
-        builder.push(" AND price >= ").push_bind(min);
-    }
-    if let Some(max) = filter.max_price {
-        builder.push(" AND price <= ").push_bind(max);
-    }
-    if let Some(sid) = filter.shop_id {
-        builder.push(" AND shop_id = ").push_bind(sid);
-    }
-    if let Some(d) = filter.date {
-        builder.push(" AND date = ").push_bind(d);
     }
     if let Some(n) = filter.notes {
         builder.push(" AND notes = ").push_bind(n);
     }
     if let Some(t) = filter.tag {
-        builder.push(" AND $1 = ANY(tags)").push_bind(t);
+        builder.push(" AND ").push_bind(t).push(" = ANY(tags)");
     }
     let query = builder.build_query_as::<Product>();
     let products = query.fetch_all(pool).await?;
@@ -118,6 +90,39 @@ pub async fn get_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
     Ok(products)
 }
 
+pub async fn get_product_entries_filtered(
+    pool: &PgPool,
+    filter: ProductFilter<'_>,
+) -> Result<Vec<ProductEntry>, sqlx::Error> {
+    use sqlx::QueryBuilder;
+    let mut builder = QueryBuilder::new(
+        "SELECT id, product_id, price, product_volume, unit, shop_id, date, notes FROM product_entries WHERE 1=1"
+    );
+    if let Some(pid) = filter.product_id {
+        builder.push(" AND product_id = ").push_bind(pid);
+    }
+    if let Some(shop_id) = filter.shop_id {
+        builder.push(" AND shop_id = ").push_bind(shop_id);
+    }
+    if let Some(min_price) = filter.min_price {
+        builder.push(" AND price >= ").push_bind(min_price);
+    }
+    if let Some(max_price) = filter.max_price {
+        builder.push(" AND price <= ").push_bind(max_price);
+    }
+    if let Some(u) = filter.unit {
+        builder.push(" AND unit = ").push_bind(u);
+    }
+    if let Some(date) = filter.date {
+        builder.push(" AND date = ").push_bind(date);
+    }
+    if let Some(n) = filter.notes {
+        builder.push(" AND notes = ").push_bind(n);
+    }
+    let query = builder.build_query_as::<ProductEntry>();
+    let entries = query.fetch_all(pool).await?;
+    Ok(entries)
+}
 
 pub async fn update_product(
     pool: &PgPool,
