@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './styles';
 import { UNIT_CONVERSIONS, normalizeUnit, normalizePricePerPiece } from './unitConversion';
+import { v4 as uuidv4 } from 'uuid';
 
 const MODES = [
 	{
@@ -13,8 +14,8 @@ const MODES = [
 			{ label: 'Product Volume', required: false, suggestions: [] },
 			{ label: 'Unit', required: true, suggestions: ['kg', 'l', 'ks'] },
 			{ label: 'Shop Name', required: false, suggestions: ['tesco', 'lidl', 'albert', 'billa'] },
-			{ label: 'Date', required: false, suggestions: [] },
 			{ label: 'Notes', required: false, suggestions: [] },
+			{ label: 'Date', required: false, suggestions: [] },
 		],
 	},
 	{
@@ -149,16 +150,21 @@ export default function HomePage() {
 					tags: entryValues[2] ? entryValues[2].split(',').map((t: string) => t.trim()) : undefined,
 				};
 			} else if (mode === 'productEntry') {
-				// Add a unique id for the product entry
-				const id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+				const id = uuidv4();
+				// Normalize product_volume and unit
+				let normalized = { value: entryValues[2], unit: entryValues[3] };
+				if (entryValues[2] && entryValues[3]) {
+					normalized = normalizeUnit(entryValues[2], entryValues[3]);
+				}
 				body = {
 					id,
 					product_name: entryValues[0],
-					price: entryValues[1],
-					product_volume: entryValues[2] || undefined,
-					unit: entryValues[3],
+					price: entryValues[1] ? Number(entryValues[1]) : undefined,
+					product_volume: normalized.value ? Number(normalized.value) : undefined,
+					unit: normalized.unit,
 					shop_name: entryValues[4] || undefined,
-					notes: entryValues[6] || undefined,
+					notes: entryValues[5] || undefined,
+					date: entryValues[6] || undefined,
 				};
 				endpoint = '/product-entries';
 			} else if (mode === 'shop') {
@@ -226,15 +232,24 @@ export default function HomePage() {
 						<div style={styles.row} key={field.label}>
 							<span style={styles.cellLabel}>{field.label}</span>
 							<div style={{ flex: 1 }}>
-								<input
-									style={styles.cellInput}
-									value={values[idx] ? values[idx].toLowerCase() : ''}
-									onChange={e => handleTableEdit(idx, e.target.value)}
-									autoCapitalize="none"
-									autoCorrect="off"
-									onFocus={() => fetchSuggestions(idx, values[idx] ? values[idx].toLowerCase() : '')}
-									aria-label="Value input"
-								/>
+								{field.label === 'Date' ? (
+									<input
+										type="date"
+										style={styles.cellInput}
+										value={values[idx] || ''}
+										onChange={e => handleTableEdit(idx, e.target.value)}
+									/>
+								) : (
+									<input
+										style={styles.cellInput}
+										value={values[idx] ? values[idx].toLowerCase() : ''}
+										onChange={e => handleTableEdit(idx, e.target.value)}
+										autoCapitalize="none"
+										autoCorrect="off"
+										onFocus={() => fetchSuggestions(idx, values[idx] ? values[idx].toLowerCase() : '')}
+										aria-label="Value input"
+									/>
+								)}
 								{activeSuggestion[idx] && values[idx] && activeSuggestion[idx].toLowerCase() !== values[idx].toLowerCase() && (
 									<span
 										style={styles.suggestion}
