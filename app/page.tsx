@@ -13,7 +13,7 @@ const MODES = [
 			{ label: 'Price', required: true, suggestions: [] },
 			{ label: 'Product Volume', required: false, suggestions: [] },
 			{ label: 'Unit', required: true, suggestions: ['kg', 'l', 'ks'] },
-			{ label: 'Shop Name', required: false, suggestions: ['tesco', 'lidl', 'albert', 'billa'] },
+			{ label: 'Shop Name', required: true, suggestions: ['tesco', 'lidl', 'albert', 'billa'] }, // Make Shop Name required
 			{ label: 'Notes', required: false, suggestions: [] },
 			{ label: 'Date', required: false, suggestions: [] },
 		],
@@ -162,7 +162,7 @@ export default function HomePage() {
 					price: entryValues[1] ? Number(entryValues[1]) : undefined,
 					product_volume: normalized.value ? Number(normalized.value) : undefined,
 					unit: normalized.unit,
-					shop_name: entryValues[4] || undefined,
+					shop_name: entryValues[4] || undefined, // always send as shop_name
 					notes: entryValues[5] || undefined,
 					date: entryValues[6] || undefined,
 				};
