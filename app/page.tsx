@@ -1,10 +1,11 @@
-"use client";
+'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './styles';
 import { UNIT_CONVERSIONS, normalizeUnit, normalizePricePerPiece } from './unitConversion';
 import { v4 as uuidv4 } from 'uuid';
 import { replaceUnderscoresWithNull } from '@/utils/text_utils';
 import StyledButton from '@/components/styledButton';
+import fetchSuggestions from '@/hooks/fetchSuggestions';
 const MODES = [
 	{
 		key: 'productEntry',
@@ -39,7 +40,7 @@ const MODES = [
 	},
 ];
 
-export default function HomePage() {
+export default   function HomePage() {
 	const [mode, setMode] = useState(MODES[0].key);
 	const currentMode = MODES.find(m => m.key === mode)!;
 	const [text, setText] = useState('');
@@ -60,40 +61,13 @@ export default function HomePage() {
 		setSuccess(false);
 		setSentEntry(null);
 	}, [mode]);
-
+ 
 	const values = text.trim().length > 0 ? text.split(/\s+/) : [];
 	while (values.length < currentMode.fields.length) values.push('');
 
-	const fetchSuggestions = async (idx: number, input: string) => {
-		let data: string[] = currentMode.fields[idx].suggestions || [];
-		if (!input) {
-			setSuggestions(s => {
-				const copy = [...s];
-				copy[idx] = data;
-				return copy;
-			});
-			setActiveSuggestion(a => {
-				const copy = [...a];
-				copy[idx] = null;
-				return copy;
-			});
-			return;
-		}
-		await new Promise(res => setTimeout(res, 150));
-		const filtered = data.filter(v => v.toLowerCase().startsWith(input.toLowerCase()));
-		setSuggestions(s => {
-			const copy = [...s];
-			copy[idx] = data;
-			return copy;
-		});
-		setActiveSuggestion(a => {
-			const copy = [...a];
-			copy[idx] = filtered.length > 0 ? filtered[0] : null;
-			return copy;
-		});
-	};
 
-	const handleTableEdit = (idx: number, newValue: string) => {
+
+	const handleTableEdit =async  (idx: number, newValue: string) => {
 		setSuccess(false);
 		const sanitizedValue = newValue.replace(/\s+/g, '-').toLowerCase();
 		const newValues = [...values];
@@ -108,7 +82,9 @@ export default function HomePage() {
 		let newLastNonEmpty = newValues.length - 1;
 		while (newLastNonEmpty > 0 && newValues[newLastNonEmpty] === '') newLastNonEmpty--;
 		setText(newValues.slice(0, newLastNonEmpty + 1).join(' '));
-		fetchSuggestions(idx, sanitizedValue);
+		const { updatedSuggestions, activeSuggestion } = await fetchSuggestions(idx, sanitizedValue, suggestions);
+		setSuggestions(updatedSuggestions);
+		setActiveSuggestion(activeSuggestion);;
 	};
 
 	useEffect(() => {
@@ -246,7 +222,7 @@ export default function HomePage() {
 							setSentEntry(null); // Clear the sent entry
 
 						}}
-					isActive={mode === m.key} 
+						isActive={mode === m.key}
 					>
 						{m.label}
 					</StyledButton>
@@ -285,9 +261,7 @@ export default function HomePage() {
 										style={styles.cellInput}
 										value={values[idx] ? values[idx].toLowerCase() : ''}
 										onChange={e => handleTableEdit(idx, e.target.value)}
-										autoCapitalize="none"
-										autoCorrect="off"
-										onFocus={() => fetchSuggestions(idx, values[idx] ? values[idx].toLowerCase() : '')}
+										onFocus={async () => fetchSuggestions(idx, values[idx] ? values[idx].toLowerCase() : '', suggestions)}
 										aria-label="Value input"
 									/>
 								)}
@@ -319,7 +293,7 @@ export default function HomePage() {
 				<div style={{ color: 'red', fontSize: 16, margin: '8px 0', textAlign: 'center' }}>{errorMsg}</div>
 			)}
 			<StyledButton onClick={handleSend} disabled={!allRequiredFilled}>Send to backend</StyledButton>
-			
+
 		</div>
 	);
 	//
