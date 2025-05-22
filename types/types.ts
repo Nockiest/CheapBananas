@@ -15,12 +15,12 @@ export interface ProductEntry {
   id: string;
   product_id: string;
   price: number;
-  product_volume?: number;
+  product_volume: number;
   unit: Unit;
   shop_name?: string;
   date?: string; // ISO 8601 format
   notes?: string;
-  quantity?: number;
+
 }
 
 export interface Shop {

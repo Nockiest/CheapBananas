@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { ProductEntry } from '@/types/types';
+import Link from 'next/link';
 const ProductEntriesPage = () => {
   const [productName, setProductName] = useState('');
  
@@ -25,7 +26,7 @@ const ProductEntriesPage = () => {
         `http://localhost:4000/product-entries/filter?product_id=${productId}`
       );
 
-      const sortedEntries = entriesResponse.data.sort((a:ProductEntry, b:ProductEntry) => a.price - b.price);
+      const sortedEntries = entriesResponse.data.sort((a:ProductEntry, b:ProductEntry) => (a.price/a.product_volume) - (b.price/b.product_volume));
       setProductEntries(sortedEntries);
     } catch (err) {
       setError('Failed to fetch product entries. Please try again later.');
@@ -43,6 +44,7 @@ const ProductEntriesPage = () => {
 
   return (
     <div style={{ padding: '20px' }}>
+      <Link href='/' style={{ textDecoration: 'none', color: 'blue' }}>Go Back</Link>
       <h1>Product Entries</h1>
       <div>
         <input
@@ -64,7 +66,8 @@ const ProductEntriesPage = () => {
               <th>Shop Name</th>
               <th>Price</th>
               <th>Notes</th>
-              <th>Quantity</th>
+              <th>Volume</th>
+              <th>Price per Unit</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -74,7 +77,8 @@ const ProductEntriesPage = () => {
                 <td>{entry.shop_name}</td>
                 <td>{entry.price}</td>
                 <td>{entry.notes || 'N/A'}</td>
-                <td>{entry.quantity || 'N/A'}</td>
+                <td>{entry.product_volume || 'N/A'}</td>
+                <td>{(entry.price / (entry.product_volume || 1)).toFixed(2)}</td>
                 <td>
                   <button onClick={() => deleteProductEntry(entry.id)} style={{ padding: '5px 10px', color: 'red' }}>
                     Delete
