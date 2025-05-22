@@ -3,7 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import styles from './styles';
 import { UNIT_CONVERSIONS, normalizeUnit, normalizePricePerPiece } from './unitConversion';
 import { v4 as uuidv4 } from 'uuid';
-
+import { replaceUnderscoresWithNull } from '@/utils/text_utils';
+import StyledButton from '@/components/styledButton';
 const MODES = [
 	{
 		key: 'productEntry',
@@ -161,7 +162,7 @@ export default function HomePage() {
 							return;
 						}
 					}
-				} catch {}
+				} catch { }
 			}
 			setDuplicateShop(false);
 		}
@@ -211,6 +212,7 @@ export default function HomePage() {
 					notes: entryValues[1] || undefined,
 				};
 			}
+			body = replaceUnderscoresWithNull(body);
 			const res = await fetch(baseUrl + endpoint, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -235,22 +237,19 @@ export default function HomePage() {
 		<div style={styles.container}>
 			<div style={{ marginBottom: 16 }}>
 				{MODES.map(m => (
-					<button
+					<StyledButton
 						key={m.key}
-						onClick={() => { setMode(m.key); setText(''); setSuccess(false); setSentEntry(null); }}
-						style={{
-							marginRight: 8,
-							padding: '6px 16px',
-							borderRadius: 6,
-							border: m.key === mode ? '2px solid #007aff' : '1px solid #ccc',
-							background: m.key === mode ? '#e6f0ff' : '#fff',
-							color: '#222',
-							fontWeight: m.key === mode ? 'bold' : 'normal',
-							cursor: 'pointer',
+						onClick={() => {
+							setMode(m.key); // Update the mode
+							setText(''); // Clear the input text
+							setSuccess(false); // Reset success state
+							setSentEntry(null); // Clear the sent entry
+
 						}}
+					isActive={mode === m.key} 
 					>
 						{m.label}
-					</button>
+					</StyledButton>
 				))}
 			</div>
 			<input
@@ -262,6 +261,11 @@ export default function HomePage() {
 				onChange={e => { setText(e.target.value.toLowerCase()); setSuccess(false); }}
 				autoCapitalize="none"
 				autoCorrect="off"
+				onKeyDown={e => {
+					if (e.key === 'Enter' && allRequiredFilled) {
+						handleSend();
+					}
+				}}
 			/>
 			{text.trim().length > 0 && (
 				<div style={styles.table}>
@@ -314,23 +318,9 @@ export default function HomePage() {
 			{errorMsg && (
 				<div style={{ color: 'red', fontSize: 16, margin: '8px 0', textAlign: 'center' }}>{errorMsg}</div>
 			)}
-			<button
-				onClick={handleSend}
-				disabled={!allRequiredFilled}
-				style={{
-					marginTop: 12,
-					padding: '10px 24px',
-					fontSize: 16,
-					borderRadius: 8,
-					background: !allRequiredFilled ? '#ccc' : '#007aff',
-					color: '#fff',
-					border: 'none',
-					cursor: !allRequiredFilled ? 'not-allowed' : 'pointer',
-				}}
-			>
-				Send to backend
-			</button>
+			<StyledButton onClick={handleSend} disabled={!allRequiredFilled}>Send to backend</StyledButton>
+			
 		</div>
 	);
-//
+	//
 }

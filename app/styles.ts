@@ -72,6 +72,33 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     display: 'inline-block',
   },
+    button: {
+    marginRight: 8,
+    padding: '6px 16px',
+    borderRadius: 6,
+    border: '1px solid #ccc',
+    background: '#fff',
+    color: '#222',
+    fontWeight: 'normal',
+    cursor: 'pointer',
+  },
+   buttonActive: {
+    border: '2px solid #007aff',
+    background: '#e6f0ff',
+    fontWeight: 'bold',
+    color: '#007aff',
+  },
 };
+
+// export const buttonStyle = (isActive: boolean): React.CSSProperties => ({
+//   marginRight: 8,
+//   padding: '6px 16px',
+//   borderRadius: 6,
+//   border: isActive ? '2px solid #007aff' : '1px solid #ccc',
+//   background: isActive ? '#e6f0ff' : '#fff',
+//   color: '#222',
+//   fontWeight: isActive ? 'bold' : 'normal',
+//   cursor: 'pointer',
+// });
 
 export default styles;
