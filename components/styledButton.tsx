@@ -22,7 +22,7 @@ const StyledButton: React.FC<StyledButtonProps> = ({ onClick, disabled = false, 
   };
 
   return (
-    <button onClick={onClick} disabled={disabled} style={baseStyle}>
+    <button className={children?.toString()} onClick={onClick} disabled={disabled} style={baseStyle}>
       {children}
     </button>
   );

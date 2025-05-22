@@ -15,10 +15,12 @@ describe('Product Form', () => {
       tags: []
     });
     cy.visit('http://localhost:3000');
+
   });
 
   it('submits a product with tags', () => {
     cy.contains('Product').click();
+     cy.get('.Product').click(); // Click on the Product button cy.get('.styled-button').contains('Product').click(); 
     // For Product: Name Notes Tags (only 3 fields)
     cy.get('input[placeholder^="Type:"]').clear().type('banana notes tag1,tag2');
     cy.get('button').contains('Send to backend').click();
@@ -27,6 +29,7 @@ describe('Product Form', () => {
 
   it('shows error if required fields are missing', () => {
     cy.contains('Product').click();
+    cy.get('[data-testid="styled-button"]').contains('Product').click(); // Click on the Product button
     cy.get('input[placeholder^="Type:"]').clear().type('');
     cy.get('button').contains('Send to backend').should('be.disabled');
     cy.contains('Please fill in all required fields').should('be.visible');

@@ -81,14 +81,11 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#222',
     fontWeight: 'normal',
     cursor: 'pointer',
+   
   },
-   buttonActive: {
-    border: '2px solid #007aff',
-    background: '#e6f0ff',
-    fontWeight: 'bold',
-    color: '#007aff',
-  },
-};
+   
+}
+
 
 // export const buttonStyle = (isActive: boolean): React.CSSProperties => ({
 //   marginRight: 8,

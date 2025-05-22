@@ -4,11 +4,15 @@ describe('Shop Form', () => {
   beforeEach(() => {
     // Ensure the shop does not exist, then create it
     ['tesco', 'lidl', 'albert', 'billa'].forEach(shopName => {
-      cy.request({
-        method: 'DELETE',
-        url: `http://localhost:4000/shops/${shopName}`,
-        failOnStatusCode: false // ignore 404 errors
-      });
+      try {
+        cy.request({
+          method: 'DELETE',
+          url: `http://localhost:4000/shops/${shopName}`,
+          failOnStatusCode: false // ignore 404 errors
+        });
+      } catch (error) {
+        cy.log(`Failed to connect to backend for shop: ${shopName}`);
+      }
     });
     cy.visit('http://localhost:3000');
   });

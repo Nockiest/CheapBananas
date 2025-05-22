@@ -82,8 +82,6 @@ export default function HomePage() {
 		errorText = `Please fill in all required fields for ${currentMode.label}.`;
 	} else if (volumeInvalid) {
 		errorText = 'Product volume must be positive.';
-	} else if (duplicateShop) {
-		errorText = 'Shop already exists.';
 	}
 
 	const handleSend = async () => {
@@ -114,28 +112,20 @@ export default function HomePage() {
 			let baseUrl = 'http://localhost:4000';
 			if (mode === 'product') {
 				endpoint = '/products';
-				// The backend expects a Product struct, which requires an id field.
-				// We'll generate a UUID here and send it as part of the product object.
-				// You can use the uuid library for this:
-				// npm install uuid
-				// import { v4 as uuidv4 } from 'uuid';
-				// For now, use a simple UUID generator:
-				const uuid = URL.createObjectURL(new Blob()).split('/').pop();
 				body = {
-					id: uuid,
+					// id: uuid,
 					name: entryValues[0],
 					notes: entryValues[1] || undefined,
 					tags: entryValues[2] ? entryValues[2].split(',').map((t: string) => t.trim()) : undefined,
 				};
 			} else if (mode === 'productEntry') {
-				const id = uuidv4();
+
 				// Normalize product_volume and unit
 				let normalized = { value: entryValues[2], unit: entryValues[3] };
 				if (entryValues[2] && entryValues[3]) {
 					normalized = normalizeUnit(entryValues[2], entryValues[3]);
 				}
 				body = {
-					id,
 					product_name: entryValues[0],
 					price: entryValues[1] ? Number(entryValues[1]) : undefined,
 					product_volume: normalized.value ? Number(normalized.value) : undefined,
@@ -153,6 +143,7 @@ export default function HomePage() {
 					notes: entryValues[1] || undefined,
 				};
 			}
+			body.id = uuidv4();
 			body = replaceUnderscoresWithNull(body);
 			const res = await fetch(baseUrl + endpoint, {
 				method: 'POST',
@@ -173,6 +164,11 @@ export default function HomePage() {
 			setErrorMsg(e?.message || 'Failed to send');
 		}
 	};
+	useEffect(() => {
+		setSuggestions(currentMode.fields.map(f => f.suggestions));
+		setActiveSuggestion(Array(currentMode.fields.length).fill(null));
+	}, [text, mode]);
+
 
 	return (
 		<div style={styles.container}>
