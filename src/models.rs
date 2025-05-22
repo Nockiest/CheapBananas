@@ -42,9 +42,10 @@ pub struct ProductEntry {
     pub id: Uuid,
     pub product_id: Uuid,
     pub price: f64,
-    pub product_volume: Option<f64>,
+    pub product_volume:f64,
     pub unit: Unit,
     pub shop_id: Option<Uuid>,
+    pub shop_name: Option<String>, // Added field to include shop name
     pub date: Option<NaiveDateTime>,
     pub notes: Option<String>,
 }

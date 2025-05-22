@@ -288,7 +288,22 @@ pub async fn axum_post_product_entry(
         body,
     )
 }
-
+pub async fn axum_delete_product_entry(
+    State(pool): State<Arc<PgPool>>,
+    Path(id): Path<String>,
+) -> (axum::http::StatusCode, String) {
+    match Uuid::parse_str(&id) {
+        Ok(uuid) => match db::delete_product_entry(&pool, uuid).await {
+            Ok(affected) if affected > 0 => (200, json!({"deleted": affected}).to_string()),
+            Ok(_) => (404, json!({"error": "Product entry not found"}).to_string()),
+            Err(e) => (500, json!({"error": e.to_string()}).to_string()),
+        },
+        Err(e) => (
+            400,
+            json!({"error": format!("Invalid UUID: {}", e)}).to_string(),
+        ),
+    }
+}
 
 pub async fn axum_post_shop(
     State(pool): State<Arc<PgPool>>,
@@ -297,7 +312,14 @@ pub async fn axum_post_shop(
     // Sanitize incoming JSON payload
     let sanitized_payload = sanitize_underscores_to_empty(payload);
 
-    let shop: Result<Shop, _> = serde_json::from_value(sanitized_payload);
+    // Add a default ID if not provided
+    let mut shop_data = sanitized_payload.as_object().cloned().unwrap_or_default();
+    if !shop_data.contains_key("id") {
+        shop_data.insert("id".to_string(), serde_json::json!(Uuid::new_v4()));
+    }
+
+    // Attempt to deserialize the shop
+    let shop: Result<Shop, _> = serde_json::from_value(serde_json::Value::Object(shop_data));
     match shop {
         Ok(shop) => {
             println!("[INFO] Received shop POST: name={}", shop.name);
@@ -317,17 +339,16 @@ pub async fn axum_post_shop(
                     )
                 },
             }
-        },
+        }
         Err(e) => {
             println!("[ERROR] Invalid shop JSON: {}", e);
             (
                 axum::http::StatusCode::BAD_REQUEST,
                 serde_json::json!({"error": format!("Invalid shop JSON: {}", e)}).to_string(),
             )
-        },
+        }
     }
 }
-
 #[derive(Debug, Deserialize)]
 pub struct ProductFilterQuery {
     pub id: Option<Uuid>,
@@ -367,15 +388,15 @@ pub async fn axum_get_products_filtered(
     };
     println!("[DEBUG] Built ProductFilter: {:?}", filter);
     let result = db::get_products_filtered(&pool, filter).await;
-    match &result {
-        Ok(products) => println!("[DEBUG] Filtered products count: {}", products.len()),
-        Err(e) => println!("[DEBUG] Error filtering products: {}", e),
-    }
     match result {
-        Ok(products) => (
-            axum::http::StatusCode::OK,
-            serde_json::to_string(&products).unwrap(),
-        ),
+        Ok(mut products) => {
+            // If you want to enrich products with shop info, you need to redesign Product to include shop_id and shop_name fields.
+            // For now, just return the products as-is.
+            (
+                axum::http::StatusCode::OK,
+                serde_json::to_string(&products).unwrap(),
+            )
+        }
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             serde_json::json!({"error": e.to_string()}).to_string(),
@@ -407,15 +428,27 @@ pub async fn axum_get_product_entries_filtered(
     };
     println!("[DEBUG] Built ProductFilter for entries: {:?}", filter);
     let result = db::get_product_entries_filtered(&pool, filter).await;
-    match &result {
-        Ok(entries) => println!("[DEBUG] Filtered product entries: {:?}", entries),
-        Err(e) => println!("[DEBUG] Error filtering product entries: {}", e),
-    }
     match result {
-        Ok(entries) => (
-            axum::http::StatusCode::OK,
-            serde_json::to_string(&entries).unwrap(),
-        ),
+        Ok(mut entries) => {
+            for entry in &mut entries {
+                if let Some(shop_id) = entry.shop_id {
+                    match db::get_shop_by_id(&pool, shop_id).await {
+                        Ok(Some(shop)) => entry.shop_name = Some(shop.name),
+                        Ok(None) => entry.shop_name = None, // Shop not found
+                        Err(e) => {
+                            return (
+                                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                                serde_json::json!({"error": e.to_string()}).to_string(),
+                        );
+                        }
+                    }
+                }
+            }
+            (
+                axum::http::StatusCode::OK,
+                serde_json::to_string(&entries).unwrap(),
+            )
+        }
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             serde_json::json!({"error": e.to_string()}).to_string(),
@@ -466,11 +499,13 @@ pub fn build_app_router(shared_pool: Arc<PgPool>) -> Router {
         .route("/products/filter", get(axum_get_products_filtered))
         .route(
             "/products/{id}",
-            get(axum_get_product)
-                .put(axum_put_product)
-                .delete(axum_delete_product),
+            get(axum_get_product),
         )
         .route("/product-entries", post(axum_post_product_entry))
+        .route(
+            "/product-entries/{id}",
+            delete(axum_delete_product_entry),
+        )
         .route("/shops", post(axum_post_shop))
         .route(
             "/product-entries/filter",

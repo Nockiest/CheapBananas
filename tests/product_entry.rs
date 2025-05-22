@@ -4,7 +4,7 @@ use backend::db::*;
 use backend::models::{Product, ProductEntry, Unit, Shop};
 use uuid::Uuid;
 use chrono::Utc;
-
+cargo check
 mod common;
 use common::setup_db;
 // ...existing code for ProductEntry tests will be inserted here...

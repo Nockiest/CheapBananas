@@ -77,6 +77,16 @@ pub async fn delete_shop(pool: &PgPool, shop_id: Uuid) -> Result<u64, sqlx::Erro
     Ok(result.rows_affected())
 }
 
+pub async fn delete_product_entry(pool: &PgPool, entry_id: Uuid) -> Result<u64, sqlx::Error> {
+    let result = sqlx::query!(
+        "DELETE FROM product_entries WHERE id = $1",
+        entry_id
+    )
+    .execute(pool)
+    .await?;
+    Ok(result.rows_affected())
+}
+
 pub async fn get_products_filtered(
     pool: &PgPool,
     filter: ProductFilter<'_>,
@@ -250,4 +260,24 @@ pub async fn get_product_by_name(pool: &PgPool, name: &str) -> Result<Option<Pro
     .await?;
     Ok(product)
 }
- 
+// (Assuming this is the start of your db.rs file)
+// ... other imports and code ...
+
+
+use crate::models::Shop;
+
+// Add this function to your db.rs file
+pub async fn get_shop_by_id(pool: &PgPool, shop_id: Uuid) -> Result<Option<Shop>, sqlx::Error> {
+    let shop = sqlx::query_as!(
+        Shop,
+        r#"
+        SELECT id, name, notes
+        FROM shops
+        WHERE id = $1
+        "#,
+        shop_id
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(shop)
+}
