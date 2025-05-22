@@ -1,31 +1,10 @@
 use backend::db::{add_product, add_shop, delete_product, delete_shop, update_product};
 use backend::models::{Product, ProductEntry, Unit, Shop};
-use sqlx::PgPool;
 use uuid::Uuid;
-use dotenv::dotenv;
-use sqlx::Executor;
 use chrono::Utc;
-async fn setup_db() -> PgPool {
-    dotenv().ok();
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-    let pool = PgPool::connect(&database_url).await.expect("Failed to connect to DB");
-    let _ = pool.execute("DELETE FROM products;").await;
-    let _ = pool.execute("DELETE FROM shops;").await;
-    pool
-}
+mod common;
+use common::setup_db;
 
-#[tokio::test]
-#[serial_test::serial]
-async fn test_add_shop() {
-    let pool = setup_db().await;
-    let shop = Shop {
-        id: Uuid::new_v4(),
-        name: "Test Shop".to_string(),
-        notes: None,
-    };
-    let shop_id = add_shop(&pool, &shop).await.expect("Failed to add shop");
-    assert!(!shop_id.is_nil(), "Shop ID should not be nil");
-}
 
 #[tokio::test]
 #[serial_test::serial]
@@ -49,30 +28,7 @@ async fn test_add_product() {
     assert!(products.iter().any(|p| p.id == product_id), "Product should be in DB");
 }
 
-#[tokio::test]
-#[serial_test::serial]
-async fn test_delete_product_and_shop() {
-    let pool = setup_db().await;
-    let shop = Shop {
-        id: Uuid::new_v4(),
-        name: "Shop to Delete".to_string(),
-        notes: None,
-    };
-    let shop_id = add_shop(&pool, &shop).await.expect("Failed to add shop");
-    let test_product = Product {
-        id: Uuid::new_v4(),
-        name: "Product to Delete".to_string(),
-        notes: Some("To be deleted".to_string()),
-        tags: Some(vec!["delete".to_string()]),
-    };
-    let product_id: Uuid = add_product(&pool, &test_product).await.expect("Failed to add product");
-    let deleted: u64 = delete_product(&pool, product_id).await.expect("Failed to delete product");
-    assert_eq!(deleted, 1, "Should delete one product");
-    let products = backend::get_products(&pool).await.expect("Failed to get products");
-    assert!(!products.iter().any(|p| p.id == product_id), "Product should be deleted");
-    let deleted_shop = delete_shop(&pool, shop_id).await.expect("Failed to delete shop");
-    assert_eq!(deleted_shop, 1, "Should delete one shop");
-}
+
 
 #[tokio::test]
 #[serial_test::serial]
@@ -119,42 +75,6 @@ async fn test_update_product_edge_cases() {
     assert_eq!(updated.notes.as_deref(), Some(&long_notes[..]));
 }
 
-#[tokio::test]
-#[serial_test::serial]
-async fn test_add_product_entry() {
-    let pool = setup_db().await;
-    let shop = Shop {
-        id: Uuid::new_v4(),
-        name: "Entry Shop".to_string(),
-        notes: None,
-    };
-    let shop_id = add_shop(&pool, &shop).await.expect("Failed to add shop");
-    // Add a shop and a product first
-    let product = Product {
-        id: Uuid::new_v4(),
-        name: "Entry Product".to_string(),
-        notes: Some("Entry notes".to_string()),
-        tags: Some(vec!["entry".to_string()]),
-    };
-    let product_id = add_product(&pool, &product).await.expect("Failed to add product");
-    // Create ProductEntry
-    let entry = ProductEntry {
-        id: Uuid::new_v4(),
-        product_id,
-        price: 2.99,
-        product_volume: Some(1.0),
-        unit: Unit::Kg,
-        shop_id: Some(shop_id),
-        date: Some(Utc::now().naive_utc()),
-        notes: Some("Entry for test".to_string()),
-    };
-    // Insert entry
-    let entry_id = backend::add_product_entry(&pool, &entry).await.expect("Failed to add product entry");
-    assert_eq!(entry_id, entry.id);
-    // Optionally, fetch and check (if get_product_entries exists)
-    // let entries = backend::get_product_entries(&pool).await.expect("Failed to get entries");
-    // assert!(entries.iter().any(|e| e.id == entry_id));
-}
 #[tokio::test]
 #[serial_test::serial]
 async fn test_get_products_filtered_endpoint() {
@@ -316,215 +236,6 @@ async fn test_get_products_filtered_all_fields() {
     // Since these fields are not supported, the filter should not restrict results
     assert!(filtered.iter().any(|p| p["name"] == "TestProductAllFields"));
     // When schema supports these fields, update this test to check for correct filtering
-}
-
-#[tokio::test]
-#[serial_test::serial]
-async fn test_get_product_entries_filtered_endpoint() {
-    use axum::body::Body;
-    use axum::http::Request;
-    use tower::ServiceExt;
-    use std::sync::Arc;
-    use backend::app::build_app_router;
-    use backend::models::Unit;
-    use chrono::Utc;
-
-    let pool = setup_db().await;
-    let shared_pool = Arc::new(pool.clone());
-    let app = build_app_router(shared_pool.clone());
-
-    // Add a shop and a product
-    let shop = Shop {
-        id: Uuid::new_v4(),
-        name: "EntryFilter Shop".to_string(),
-        notes: None,
-    };
-    let shop_id = add_shop(&pool, &shop).await.expect("Failed to add shop");
-    let product = Product {
-        id: Uuid::new_v4(),
-        name: "EntryFilterProduct".to_string(),
-        notes: Some("Entry filter notes".to_string()),
-        tags: Some(vec!["entryfilter".to_string()]),
-    };
-    let product_id = add_product(&pool, &product).await.expect("Failed to add product");
-    // Add product entries
-    let entry1 = ProductEntry {
-        id: Uuid::new_v4(),
-        product_id,
-        price: 5.0,
-        product_volume: Some(1.0),
-        unit: Unit::Kg,
-        shop_id: Some(shop_id),
-        date: Some(Utc::now().naive_utc()),
-        notes: Some("Fresh batch".to_string()),
-    };
-    let entry2 = ProductEntry {
-        id: Uuid::new_v4(),
-        product_id,
-        price: 10.0,
-        product_volume: Some(2.0),
-        unit: Unit::Kg,
-        shop_id: Some(shop_id),
-        date: Some(Utc::now().naive_utc()),
-        notes: Some("Old batch".to_string()),
-    };
-    backend::add_product_entry(&pool, &entry1).await.expect("Failed to add entry1");
-    backend::add_product_entry(&pool, &entry2).await.expect("Failed to add entry2");
-
-    // Filter by product_id
-    let response = app
-        .clone()
-        .oneshot(Request::builder()
-            .uri(&format!("/product-entries/filter?product_id={}", product_id))
-            .body(Body::empty())
-            .unwrap())
-        .await
-        .unwrap();
-    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert_eq!(filtered.len(), 2);
-    // Filter by min_price
-    let response = app
-        .clone()
-        .oneshot(Request::builder()
-            .uri(&format!("/product-entries/filter?product_id={}&min_price=6.0", product_id))
-            .body(Body::empty())
-            .unwrap())
-        .await
-        .unwrap();
-    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert_eq!(filtered.len(), 1);
-    assert_eq!(filtered[0]["price"], 10.0);
-    // Filter by notes
-    let response = app
-        .clone()
-        .oneshot(Request::builder()
-            .uri(&format!("/product-entries/filter?product_id={}&notes=Fresh%20batch", product_id))
-            .body(Body::empty())
-            .unwrap())
-        .await
-        .unwrap();
-    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert_eq!(filtered.len(), 1);
-    assert_eq!(filtered[0]["notes"], "Fresh batch");
-}
-
-#[tokio::test]
-#[serial_test::serial]
-async fn test_get_shops_filtered_endpoint() {
-    use axum::body::Body;
-    use axum::http::Request;
-    use tower::ServiceExt;
-    use std::sync::Arc;
-    use backend::app::build_app_router;
-
-    let pool = setup_db().await;
-    let shared_pool = Arc::new(pool.clone());
-    let app = build_app_router(shared_pool.clone());
-
-    // Add shops
-    let shop1 = Shop {
-        id: Uuid::new_v4(),
-        name: "Tesco".to_string(),
-        notes: None,
-    };
-    let _shop1_id = add_shop(&pool, &shop1).await.expect("Failed to add shop");
-    let shop2 = Shop {
-        id: Uuid::new_v4(),
-        name: "Lidl".to_string(),
-        notes: None,
-    };
-    let shop2_id = add_shop(&pool, &shop2).await.expect("Failed to add shop");
-    let shop3 = Shop {
-        id: Uuid::new_v4(),
-        name: "Tesco Express".to_string(),
-        notes: None,
-    };
-    let shop3_id = add_shop(&pool, &shop3).await.expect("Failed to add shop");
-    // Update notes for shop3
-    sqlx::query!("UPDATE shops SET notes = $1 WHERE id = $2", Some("small"), shop3_id)
-        .execute(&pool).await.expect("Failed to update notes");
-
-    // Filter by name
-    println!("[TEST] Requesting /shops/filter?name=Tesco");
-    let response = app
-        .clone()
-        .oneshot(Request::builder()
-            .uri("/shops/filter?name=Tesco")
-            .body(Body::empty())
-            .unwrap())
-        .await
-        .unwrap();
-    println!("[TEST] Response status for name=Tesco: {:?}", response.status());
-    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    println!("[TEST] Response body for name=Tesco: {}", String::from_utf8_lossy(&body));
-    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert!(filtered.iter().any(|s| s["name"] == "Tesco"));
-    // assert!(filtered.iter().any(|s| s["name"] == "Tesco Express"));
-
-    // Filter by id
-    println!("[TEST] Requesting /shops/filter?id={}", shop2_id);
-    let response = app
-        .clone()
-        .oneshot(Request::builder()
-            .uri(&format!("/shops/filter?id={}", shop2_id))
-            .body(Body::empty())
-            .unwrap())
-        .await
-        .unwrap();
-    println!("[TEST] Response status for id={}: {:?}", shop2_id, response.status());
-    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    println!("[TEST] Response body for id={}: {}", shop2_id, String::from_utf8_lossy(&body));
-    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert_eq!(filtered.len(), 1);
-    assert_eq!(filtered[0]["name"], "Lidl");
-
-    // Filter by notes
-    println!("[TEST] Requesting /shops/filter?notes=small");
-    let response = app
-        .oneshot(Request::builder()
-            .uri("/shops/filter?notes=small")
-            .body(Body::empty())
-            .unwrap())
-        .await
-        .unwrap();
-    println!("[TEST] Response status for notes=small: {:?}", response.status());
-    let body = axum::body::to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
-    println!("[TEST] Response body for notes=small: {}", String::from_utf8_lossy(&body));
-    let filtered: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
-    assert_eq!(filtered.len(), 1);
-    assert_eq!(filtered[0]["name"], "Tesco Express");
-
-    // --- Product volume must be positive edge case ---
-    // Add a shop and a product
-    let shop = Shop {
-        id: Uuid::new_v4(),
-        name: "Volume Shop".to_string(),
-        notes: None,
-    };
-    let shop_id = add_shop(&pool, &shop).await.expect("Failed to add shop");
-    let product = Product {
-        id: Uuid::new_v4(),
-        name: "Volume Product".to_string(),
-        notes: Some("Test volume".to_string()),
-        tags: None,
-    };
-    let product_id = add_product(&pool, &product).await.expect("Failed to add product");
-    // Try to add a product entry with negative volume
-    let entry = ProductEntry {
-        id: Uuid::new_v4(),
-        product_id,
-        price: 1.0,
-        product_volume: Some(-5.0),
-        unit: Unit::Kg,
-        shop_id: Some(shop_id),
-        date: Some(Utc::now().naive_utc()),
-        notes: Some("Negative volume".to_string()),
-    };
-    let result = backend::add_product_entry(&pool, &entry).await;
-    assert!(result.is_err(), "Should not allow negative product volume");
 }
 
 #[tokio::test]

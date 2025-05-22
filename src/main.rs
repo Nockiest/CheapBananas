@@ -3,13 +3,8 @@ mod db;
 mod app;
 mod utils;
 
-use utils::text_utils::sanitize_underscores_to_empty;
 use sqlx::{FromRow, PgPool};
-use crate::models::{Product, Shop};
-use axum::{
-    extract::{Path, State},
-    Router, Json,
-};
+
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use axum::serve;

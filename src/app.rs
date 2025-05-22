@@ -1,5 +1,5 @@
-use crate::db;
-use crate::models::{Product, ProductEntry, ProductFilter};
+use crate::{db};
+use crate::models::{Product, Shop, ProductEntry, ProductFilter};
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
@@ -11,7 +11,7 @@ use sqlx::PgPool;
 use std::sync::Arc;
 use tower_http::cors::{CorsLayer, Any};
 use uuid::Uuid;
-
+use crate::utils::text_utils::sanitize_underscores_to_empty;
 // --- Handler logic ---
 pub async fn handle_post_request(pool: &PgPool, request: &str) -> (u16, String) {
     match serde_json::from_str::<Product>(request) {
@@ -127,7 +127,7 @@ pub async fn handle_post_product_entry(pool: &PgPool, request: &str) -> (u16, St
     use serde_json::Value;
     println!("[INFO] Incoming product entry POST body: {}", request);
     match serde_json::from_str::<Value>(request) {
-        Ok(mut entry_val) => {
+        Ok(entry_val) => {
             println!("[DEBUG] Parsed JSON for product entry: {:?}", entry_val);
             // Try to resolve product_name to product_id before any further validation
             let product_name = entry_val.get("product_name").and_then(|v| v.as_str());
@@ -208,19 +208,23 @@ pub async fn handle_post_product_entry(pool: &PgPool, request: &str) -> (u16, St
     }
 }
 
-// --- Axum handler wrappers ---
+// --- Axum handler wrappers ---x
 pub async fn axum_post_product(
     State(pool): State<Arc<PgPool>>,
     Json(payload): Json<serde_json::Value>,
 ) -> (axum::http::StatusCode, String) {
-    let (code, body) = handle_post_request(&pool, &payload.to_string()).await;
+    // Sanitize incoming JSON payload
+    let sanitized_payload = sanitize_underscores_to_empty(payload);
+
+    // Convert sanitized payload to string and pass to handler
+    let (code, body) = handle_post_request(&pool, &sanitized_payload.to_string()).await;
+
     (
         axum::http::StatusCode::from_u16(code)
             .unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
         body,
     )
 }
-
 pub async fn axum_get_product(
     State(pool): State<Arc<PgPool>>,
     Path(id): Path<String>,
@@ -268,12 +272,16 @@ pub async fn axum_delete_product(
         body,
     )
 }
-
 pub async fn axum_post_product_entry(
     State(pool): State<Arc<PgPool>>,
     Json(payload): Json<serde_json::Value>,
 ) -> (axum::http::StatusCode, String) {
-    let (code, body) = handle_post_product_entry(&pool, &payload.to_string()).await;
+    // Sanitize incoming JSON payload
+    let sanitized_payload = sanitize_underscores_to_empty(payload);
+
+    // Convert sanitized payload to string and pass to handler
+    let (code, body) = handle_post_product_entry(&pool, &sanitized_payload.to_string()).await;
+
     (
         axum::http::StatusCode::from_u16(code)
             .unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
@@ -281,12 +289,15 @@ pub async fn axum_post_product_entry(
     )
 }
 
+
 pub async fn axum_post_shop(
     State(pool): State<Arc<PgPool>>,
     Json(payload): Json<serde_json::Value>,
 ) -> (axum::http::StatusCode, String) {
-    use crate::models::Shop;
-    let shop: Result<Shop, _> = serde_json::from_value(payload);
+    // Sanitize incoming JSON payload
+    let sanitized_payload = sanitize_underscores_to_empty(payload);
+
+    let shop: Result<Shop, _> = serde_json::from_value(sanitized_payload);
     match shop {
         Ok(shop) => {
             println!("[INFO] Received shop POST: name={}", shop.name);
