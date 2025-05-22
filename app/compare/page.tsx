@@ -63,11 +63,11 @@ const ProductEntriesPage = () => {
         <table   style={{ marginTop: '20px', width: '100%', textAlign: 'left' }}>
           <thead>
             <tr>
-              <th>Shop Name</th>
-              <th>Price</th>
+              <th>Shop</th>
+              <th>CZK</th>
               <th>Notes</th>
               <th>Volume</th>
-              <th>Price per Unit</th>
+              <th>$ per Unit</th>
               <th>Action</th>
             </tr>
           </thead>
