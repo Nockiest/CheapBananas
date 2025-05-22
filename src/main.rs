@@ -1,6 +1,9 @@
 mod models;
 mod db;
 mod app;
+mod utils;
+
+use utils::text_utils::sanitize_underscores_to_empty;
 use sqlx::{FromRow, PgPool};
 use crate::models::{Product, Shop};
 use axum::{

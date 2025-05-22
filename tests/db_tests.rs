@@ -530,7 +530,8 @@ async fn test_get_shops_filtered_endpoint() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_sanitize_underscores_to_empty_on_required_fields() {
-    use backend::db::sanitize_underscores_to_empty;
+   
+use backend::utils::text_utils::sanitize_underscores_to_empty; 
     use serde_json::json;
     use backend::models::{Product, ProductEntry};
     let pool = setup_db().await;
