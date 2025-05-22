@@ -6,9 +6,10 @@ import { v4 as uuidv4 } from 'uuid';
 import { replaceUnderscoresWithNull } from '@/utils/text_utils';
 import StyledButton from '@/components/styledButton';
 import fetchSuggestions from '@/hooks/fetchSuggestions';
-import MODES from  './modes'
+import MODES from './modes'
+import Link from 'next/link';
 
-export default   function HomePage() {
+export default function HomePage() {
 	const [mode, setMode] = useState(MODES[0].key);
 	const currentMode = MODES.find(m => m.key === mode)!;
 	const [text, setText] = useState('');
@@ -29,13 +30,13 @@ export default   function HomePage() {
 		setSuccess(false);
 		setSentEntry(null);
 	}, [mode]);
- 
+
 	const values = text.trim().length > 0 ? text.split(/\s+/) : [];
 	while (values.length < currentMode.fields.length) values.push('');
 
 
 
-	const handleTableEdit =async  (idx: number, newValue: string) => {
+	const handleTableEdit = async (idx: number, newValue: string) => {
 		setSuccess(false);
 		const sanitizedValue = newValue.replace(/\s+/g, '-').toLowerCase();
 		const newValues = [...values];
@@ -261,6 +262,9 @@ export default   function HomePage() {
 				<div style={{ color: 'red', fontSize: 16, margin: '8px 0', textAlign: 'center' }}>{errorMsg}</div>
 			)}
 			<StyledButton onClick={handleSend} disabled={!allRequiredFilled}>Send to backend</StyledButton>
+			<Link href="/compare">
+				<StyledButton onClick={() => { }}>Go to Compare Page</StyledButton>
+			</Link>
 
 		</div>
 	);
