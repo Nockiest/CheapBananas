@@ -1,12 +1,25 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 use crate::models::{Product, ProductEntry, ProductFilter};
+use serde_json::Value;
 
-pub async fn add_shop(pool: &PgPool, name: &str) -> Result<Uuid, sqlx::Error> {
-    let shop = sqlx::query!("INSERT INTO shops (name) VALUES ($1) RETURNING id", name)
-        .fetch_one(pool)
+pub async fn add_shop(pool: &PgPool, shop: &crate::models::Shop) -> Result<Uuid, sqlx::Error> {
+    // Prevent duplicate shop names (case-insensitive)
+    let existing = sqlx::query!("SELECT id FROM shops WHERE LOWER(name) = LOWER($1)", shop.name)
+        .fetch_optional(pool)
         .await?;
-    Ok(shop.id)
+    if let Some(_row) = existing {
+        return Err(sqlx::Error::Protocol("Shop already exists".into()));
+    }
+    let row = sqlx::query!(
+        "INSERT INTO shops (id, name, notes) VALUES ($1, $2, $3) RETURNING id",
+        shop.id,
+        shop.name,
+        shop.notes
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row.id)
 }
 
 pub async fn add_product(pool: &PgPool, product: &Product) -> Result<Uuid, sqlx::Error> {
@@ -23,6 +36,12 @@ pub async fn add_product(pool: &PgPool, product: &Product) -> Result<Uuid, sqlx:
 }
 //
 pub async fn add_product_entry(pool: &PgPool, entry: &ProductEntry) -> Result<Uuid, sqlx::Error> {
+    // --- Validation: product_volume must be positive if present ---
+    if let Some(v) = entry.product_volume {
+        if v < 0.0 {
+            return Err(sqlx::Error::Protocol("Product volume must be positive".into()));
+        }
+    }
     let row = sqlx::query!(
         "INSERT INTO product_entries (id, product_id, price, product_volume, unit, shop_id, date, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
         entry.id,
@@ -231,4 +250,27 @@ pub async fn get_product_by_name(pool: &PgPool, name: &str) -> Result<Option<Pro
     .fetch_optional(pool)
     .await?;
     Ok(product)
+}
+
+/// Recursively replaces any string value that is only underscores (e.g. "_", "__") with an empty string in a serde_json::Value
+pub fn sanitize_underscores_to_empty(mut value: Value) -> Value {
+    match &mut value {
+        Value::String(s) => {
+            if s.chars().all(|c| c == '_') {
+                *s = String::new();
+            }
+        }
+        Value::Array(arr) => {
+            for v in arr.iter_mut() {
+                *v = sanitize_underscores_to_empty(v.take());
+            }
+        }
+        Value::Object(map) => {
+            for (_k, v) in map.iter_mut() {
+                *v = sanitize_underscores_to_empty(v.take());
+            }
+        }
+        _ => {}
+    }
+    value
 }

@@ -131,10 +131,33 @@ pub async fn handle_post_product_entry(pool: &PgPool, request: &str) -> (u16, St
             println!("[DEBUG] Parsed JSON for product entry: {:?}", entry_val);
             // Try to resolve product_name to product_id before any further validation
             let product_name = entry_val.get("product_name").and_then(|v| v.as_str());
+            let shop_name = entry_val.get("shop_name").and_then(|v| v.as_str());
             if product_name.is_none() {
                 println!("[ERROR] Missing product_name in product entry JSON");
                 return (400, json!({"error": "Missing product_name in product entry"}).to_string());
             }
+            if shop_name.is_none() {
+                println!("[ERROR] Missing shop_name in product entry JSON");
+                return (400, json!({"error": "Missing shop_name in product entry"}).to_string());
+            }
+            // If shop_name is provided, check if it exists
+            let shop_id_opt = if let Some(shop_name) = shop_name {
+                println!("[INFO] Looking up shop by name: {}", shop_name);
+                match db::get_shops_filtered(pool, crate::models::ShopFilter { name: Some(shop_name), ..Default::default() }).await {
+                    Ok(shops) if !shops.is_empty() => {
+                        println!("[INFO] Found shop id {} for name {}", shops[0].id, shop_name);
+                        Some(shops[0].id)
+                    },
+                    Ok(_) => {
+                        println!("[ERROR] No shop found with name: {}", shop_name);
+                        return (400, json!({"error": format!("No shop found with name: {}", shop_name)}).to_string());
+                    },
+                    Err(e) => {
+                        println!("[ERROR] DB error looking up shop by name: {}", e);
+                        return (500, json!({"error": e.to_string()}).to_string());
+                    }
+                }
+            } else { None };
             println!("[INFO] Looking up product by name: {}", product_name.unwrap());
             match db::get_product_by_name(pool, product_name.unwrap()).await {
                 Ok(Some(product)) => {
@@ -142,6 +165,9 @@ pub async fn handle_post_product_entry(pool: &PgPool, request: &str) -> (u16, St
                     println!("[INFO] Found product id {} for name {}", product_id, product_name.unwrap());
                     let mut entry_map = entry_val.as_object().unwrap().clone();
                     entry_map.insert("product_id".to_string(), serde_json::json!(product_id));
+                    if let Some(shop_id) = shop_id_opt {
+                        entry_map.insert("shop_id".to_string(), serde_json::json!(shop_id));
+                    }
                     // Remove product_name (optional, if ProductEntry expects product_id only)
                     // entry_map.remove("product_name");
                     // Now try to deserialize to ProductEntry (this will check formatting)
@@ -259,11 +285,12 @@ pub async fn axum_post_shop(
     State(pool): State<Arc<PgPool>>,
     Json(payload): Json<serde_json::Value>,
 ) -> (axum::http::StatusCode, String) {
-    let name = payload.get("name").and_then(|v| v.as_str());
-    match name {
-        Some(name) => {
-            println!("[INFO] Received shop POST: name={}", name);
-            match db::add_shop(&pool, name).await {
+    use crate::models::Shop;
+    let shop: Result<Shop, _> = serde_json::from_value(payload);
+    match shop {
+        Ok(shop) => {
+            println!("[INFO] Received shop POST: name={}", shop.name);
+            match db::add_shop(&pool, &shop).await {
                 Ok(id) => {
                     println!("[INFO] Shop added to DB with id: {}", id);
                     (
@@ -280,11 +307,11 @@ pub async fn axum_post_shop(
                 },
             }
         },
-        None => {
-            println!("[ERROR] Missing 'name' field in shop POST");
+        Err(e) => {
+            println!("[ERROR] Invalid shop JSON: {}", e);
             (
                 axum::http::StatusCode::BAD_REQUEST,
-                serde_json::json!({"error": "Missing 'name' field"}).to_string(),
+                serde_json::json!({"error": format!("Invalid shop JSON: {}", e)}).to_string(),
             )
         },
     }

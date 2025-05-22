@@ -33,15 +33,16 @@ async fn axum_delete_product(State(pool): State<Arc<PgPool>>, Path(id): Path<Str
     (axum::http::StatusCode::from_u16(code).unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR), body)
 }
 async fn axum_post_shop(State(pool): State<Arc<PgPool>>, Json(payload): Json<serde_json::Value>) -> (axum::http::StatusCode, String) {
-    let name = payload.get("name").and_then(|v| v.as_str());
-    match name {
-        Some(name) => {
-            match backend::db::add_shop(&pool, name).await {
+    use backend::models::Shop;
+    let shop: Result<Shop, _> = serde_json::from_value(payload);
+    match shop {
+        Ok(shop) => {
+            match backend::db::add_shop(&pool, &shop).await {
                 Ok(id) => (axum::http::StatusCode::CREATED, serde_json::json!({"id": id}).to_string()),
                 Err(e) => (axum::http::StatusCode::INTERNAL_SERVER_ERROR, serde_json::json!({"error": e.to_string()}).to_string()),
             }
         },
-        None => (axum::http::StatusCode::BAD_REQUEST, serde_json::json!({"error": "Missing 'name' field"}).to_string()),
+        Err(e) => (axum::http::StatusCode::BAD_REQUEST, serde_json::json!({"error": format!("Invalid shop JSON: {}", e)}).to_string()),
     }
 }
 
