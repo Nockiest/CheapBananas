@@ -19,9 +19,7 @@ export default function HomePage() {
 		currentMode.fields.map(f => f.suggestions)
 	);
 	const [activeSuggestion, setActiveSuggestion] = useState(Array(currentMode.fields.length).fill(null));
-	const abortControllers = useRef(Array(currentMode.fields.length).fill(null));
 	const [errorMsg, setErrorMsg] = useState<string | null>(null);
-	const [duplicateShop, setDuplicateShop] = useState(false);
 
 	useEffect(() => {
 		setSuggestions(currentMode.fields.map(f => f.suggestions));
@@ -102,14 +100,12 @@ export default function HomePage() {
 					if (res.ok) {
 						const shops = await res.json();
 						if (Array.isArray(shops) && shops.some((s: any) => (s.name || '').toLowerCase() === shopName)) {
-							setDuplicateShop(true);
 							setErrorMsg('Shop already exists.');
 							return;
 						}
 					}
 				} catch { }
 			}
-			setDuplicateShop(false);
 		}
 		try {
 			let entryValues = [...values];
