@@ -74,9 +74,9 @@ export default function HomePage() {
 	let volumeValue = values[volumeIdx];
 
 
-	let errorText = '';
+	//let errorText = '';
 	if (text.trim().length > 0 && !allRequiredFilled) {
-		errorText = `Please fill in all required fields for ${currentMode.label}.`;
+		setErrorMsg(`Please fill in all required fields for ${currentMode.label}.`);
 	} 
 
 	const handleSend = async () => {
@@ -213,10 +213,8 @@ export default function HomePage() {
 					))}
 				</div>
 			)}
-			{errorText !== '' && (
-				<div style={styles.errorText}>{errorText}</div>
-			)}
-			{success && errorText === '' && sentEntry && (
+			
+			{success&& sentEntry && (
 				<div style={styles.successText}>
 					{currentMode.label} sent to backend!<br />
 					<span style={{ fontSize: 14, color: '#222' }}>
