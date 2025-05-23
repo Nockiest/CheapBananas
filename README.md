@@ -1,36 +1,119 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CheapBananas
 
-## Getting Started
+CheapBananas is a web application designed to help users manage and compare product entries, shops, and related data efficiently. The project consists of a backend written in Rust and a frontend built with Next.js.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Product Management**: Add, update, and delete products.
+- **Product Entry Management**: Manage product entries with details like price, volume, and shop.
+- **Shop Management**: Add and manage shops.
+- **Search and Suggestions**: Real-time search and suggestions for products and shops.
+- **Data Validation**: Ensures data integrity with validations for required fields and duplicate entries.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Backend
+- **Language**: Rust
+- **Framework**: Axum
+- **Database**: PostgreSQL
+- **Directory**: `backend/`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Key files:
+- `app.rs`: Contains the main application logic and routes.
+- `db.rs`: Handles database interactions.
+- `models.rs`: Defines data models.
+- `utils/`: Utility functions.
 
-## Learn More
+### Frontend
+- **Framework**: Next.js
+- **Language**: TypeScript
+- **Directory**: `cheap_bananas/`
 
-To learn more about Next.js, take a look at the following resources:
+Key files:
+- `app/page.tsx`: Main page for managing products and entries.
+- `app/compare/page.tsx`: Page for comparing product entries.
+- `components/`: Reusable UI components.
+- `hooks/`: Custom React hooks.
+- `utils/`: Utility functions for the frontend.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Setup Instructions
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Prerequisites
+- Node.js and npm
+- Rust and Cargo
+- PostgreSQL
 
-## Deploy on Vercel
+### Backend Setup
+1. Navigate to the `backend/` directory:
+   ```bash
+   cd backend
+   ```
+2. Install dependencies:
+   ```bash
+   cargo build
+   ```
+3. Set up the database:
+   - Create a PostgreSQL database.
+   - Run migrations located in the `migrations/` directory.
+4. Start the backend server:
+   ```bash
+   cargo run
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Frontend Setup
+1. Navigate to the `cheap_bananas/` directory:
+   ```bash
+   cd cheap_bananas
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Testing
+
+### Backend Tests
+1. Navigate to the `backend/` directory.
+2. Run tests:
+   ```bash
+   cargo test
+   ```
+
+### Frontend Tests
+1. Navigate to the `cheap_bananas/` directory.
+2. Run Cypress tests:
+   ```bash
+   npx cypress open
+   ```
+
+## Contributing
+
+Contributions are welcome! Please follow these steps:
+1. Fork the repository.
+2. Create a new branch for your feature or bugfix:
+   ```bash
+   git checkout -b feature-name
+   ```
+3. Commit your changes:
+   ```bash
+   git commit -m "Description of changes"
+   ```
+4. Push to your fork:
+   ```bash
+   git push origin feature-name
+   ```
+5. Open a pull request.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+## Acknowledgments
+
+- [Axum](https://github.com/tokio-rs/axum) for the backend framework.
+- [Next.js](https://nextjs.org/) for the frontend framework.
+- [Cypress](https://www.cypress.io/) for end-to-end testing.
