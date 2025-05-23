@@ -1,5 +1,5 @@
 use crate::{db};
-use crate::models::{Product, Shop, ProductEntry, ProductFilter};
+use crate::models::{Product, ProductEntry, ProductFilter, Shop, ShopFilterQuery};
 use axum::{
     Json, Router,
     extract::{Path, Query, State},
@@ -107,7 +107,7 @@ pub async fn handle_put_request(pool: &PgPool, id: &str, request: &str) -> (u16,
     }
 }
 
-pub async fn handle_delete_request(pool: &PgPool, id: &str) -> (u16, String) {
+pub async fn handle_product_delete_request(pool: &PgPool, id: &str) -> (u16, String) {
     match Uuid::parse_str(id) {
         Ok(uuid) => match db::delete_product(pool, uuid).await {
             Ok(affected) if affected > 0 => (200, json!({"deleted": affected}).to_string()),
@@ -265,7 +265,7 @@ pub async fn axum_delete_product(
     State(pool): State<Arc<PgPool>>,
     Path(id): Path<String>,
 ) -> (axum::http::StatusCode, String) {
-    let (code, body) = handle_delete_request(&pool, &id).await;
+    let (code, body) = handle_product_delete_request(&pool, &id).await;
     (
         axum::http::StatusCode::from_u16(code)
             .unwrap_or(axum::http::StatusCode::INTERNAL_SERVER_ERROR),
@@ -437,23 +437,19 @@ pub async fn axum_get_product_entries_filtered(
     };
     println!("[DEBUG] Built ProductFilter for entries: {:?}", filter);
     let result = db::get_product_entries_filtered(&pool, filter).await;
+    print!("[DEBUG] Result of product entry filter: {:?}", result);
     match result {
         Ok(entries) => (
             axum::http::StatusCode::OK,
-            serde_json::to_string(&entries).unwrap(),
+            serde_json::to_string(&entries).unwrap_or_else(|_| {
+                serde_json::json!({"error": "Failed to serialize product entries."}).to_string()
+            }),
         ),
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            serde_json::json!({"error": e.to_string()}).to_string(),
+            serde_json::json!({"error": format!("Database error: {}", e)}).to_string(),
         ),
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ShopFilterQuery {
-    pub id: Option<Uuid>,
-    pub name: Option<String>,
-    pub notes: Option<String>,
 }
 
 pub async fn axum_get_shops_filtered(
@@ -492,7 +488,7 @@ pub fn build_app_router(shared_pool: Arc<PgPool>) -> Router {
         .route("/products/filter", get(axum_get_products_filtered))
         .route(
             "/products/{id}",
-            get(axum_get_product),
+            get(axum_get_product).delete(axum_delete_product).put(axum_put_product),
         )
         .route("/product-entries", post(axum_post_product_entry))
         .route(

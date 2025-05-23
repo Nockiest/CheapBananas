@@ -48,15 +48,6 @@ pub struct ProductEntry {
     pub date: Option<NaiveDateTime>,
     pub notes: Option<String>,
 }
-
-#[derive(Debug, FromRow, Serialize, Deserialize)]
-pub struct Shop {
-    pub id: Uuid,
-    pub name: String,
-    pub notes: Option<String>,
-    // Removed products field for DB compatibility
-}
-
 // Filter struct for get_products_filtered
 #[derive(Default, Debug, Deserialize)]
 pub struct ProductFilter<'a> {
@@ -74,6 +65,13 @@ pub struct ProductFilter<'a> {
     pub shop_name: Option<String>,
     pub date: Option<chrono::NaiveDateTime>,
 }
+#[derive(Debug, Deserialize)]
+pub struct ShopFilterQuery {
+    pub id: Option<Uuid>,
+    pub name: Option<String>,
+    pub notes: Option<String>,
+}
+
 
 #[derive(Default, Debug, Deserialize)]
 pub struct ShopFilter<'a> {
@@ -81,5 +79,14 @@ pub struct ShopFilter<'a> {
     pub name: Option<&'a str>,
     pub notes: Option<&'a str>,
 }
+
+#[derive(Debug, FromRow, Serialize, Deserialize)]
+pub struct Shop {
+    pub id: Uuid,
+    pub name: String,
+    pub notes: Option<String>,
+    // Removed products field for DB compatibility
+}
+
 
 pub type ProductEntryFilter<'a> = ProductFilter<'a>;

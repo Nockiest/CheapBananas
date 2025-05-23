@@ -135,33 +135,49 @@ pub async fn get_product_entries_filtered(
     filter: ProductFilter<'_>,
 ) -> Result<Vec<ProductEntry>, sqlx::Error> {
     use sqlx::QueryBuilder;
+    println!("Starting get_product_entries_filtered with filter: {:?}", filter);
+
     let mut builder = QueryBuilder::new(
-        "SELECT id, product_id, price, product_volume, unit, shop_id, date, notes FROM product_entries WHERE 1=1"
+        "SELECT id, product_id, price, product_volume, unit, shop_name, date, notes FROM product_entries WHERE 1=1"
     );
     if let Some(pid) = filter.product_id {
+        println!("Filtering by product_id: {}", pid);
         builder.push(" AND product_id = ").push_bind(pid);
     }
     if let Some(shop_name) = filter.shop_name {
+        println!("Filtering by shop_name: {}", shop_name);
         builder.push(" AND shop_name = ").push_bind(shop_name);
     }
     if let Some(min_price) = filter.min_price {
+        println!("Filtering by min_price: {}", min_price);
         builder.push(" AND price >= ").push_bind(min_price);
     }
     if let Some(max_price) = filter.max_price {
+        println!("Filtering by max_price: {}", max_price);
         builder.push(" AND price <= ").push_bind(max_price);
     }
     if let Some(u) = filter.unit {
+        println!("Filtering by unit: {}", u);
         builder.push(" AND unit = ").push_bind(u);
     }
     if let Some(date) = filter.date {
+        println!("Filtering by date: {}", date);
         builder.push(" AND date = ").push_bind(date);
     }
     if let Some(n) = filter.notes {
+        println!("Filtering by notes: {}", n);
         builder.push(" AND notes = ").push_bind(n);
     }
+
     let query = builder.build_query_as::<ProductEntry>();
-    let entries = query.fetch_all(pool).await?;
-    Ok(entries)
+
+    let entries = query.fetch_all(pool).await;
+    match &entries {
+        Ok(entries) => println!("Query successful, fetched {} entries", entries.len()),
+        Err(err) => println!("Query failed with error: {:?}", err),
+    }
+
+    entries
 }
 
 pub async fn update_product(
