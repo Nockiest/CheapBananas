@@ -72,39 +72,14 @@ export default function HomePage() {
 	// --- Additional validation: Product Volume must be positive if present ---
 	let volumeIdx = currentMode.fields.findIndex(f => f.label.toLowerCase().includes('volume'));
 	let volumeValue = values[volumeIdx];
-	let volumeInvalid = false;
-	if (currentMode.key === 'productEntry' && volumeValue && volumeValue !== '' && !isNaN(Number(volumeValue))) {
-		if (Number(volumeValue) < 0) volumeInvalid = true;
-	}
+
 
 	let errorText = '';
 	if (text.trim().length > 0 && !allRequiredFilled) {
 		errorText = `Please fill in all required fields for ${currentMode.label}.`;
-	} else if (volumeInvalid) {
-		errorText = 'Product volume must be positive.';
-	}
+	} 
 
 	const handleSend = async () => {
-		if (volumeInvalid) {
-			setErrorMsg('Product volume must be positive.');
-			return;
-		}
-		if (mode === 'shop') {
-			// Check for duplicate shop name before sending
-			const shopName = values[0]?.trim().toLowerCase();
-			if (shopName) {
-				try {
-					const res = await fetch(`http://localhost:4000/shops/filter?name=${encodeURIComponent(shopName)}`);
-					if (res.ok) {
-						const shops = await res.json();
-						if (Array.isArray(shops) && shops.some((s: any) => (s.name || '').toLowerCase() === shopName)) {
-							setErrorMsg('Shop already exists.');
-							return;
-						}
-					}
-				} catch { }
-			}
-		}
 		try {
 			let entryValues = [...values];
 			let endpoint = '';
@@ -113,7 +88,6 @@ export default function HomePage() {
 			if (mode === 'product') {
 				endpoint = '/products';
 				body = {
-					// id: uuid,
 					name: entryValues[0],
 					notes: entryValues[1] || undefined,
 					tags: entryValues[2] ? entryValues[2].split(',').map((t: string) => t.trim()) : undefined,
