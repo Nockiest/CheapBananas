@@ -152,9 +152,9 @@ async fn test_get_shops_filtered_endpoint() {
         id: Uuid::new_v4(),
         product_id,
         price: 1.0,
-        product_volume: Some(-5.0),
+        product_volume: -5.0,
         unit: Unit::Kg,
-        shop_id: Some(shop_id),
+        shop_name: None,
         date: Some(Utc::now().naive_utc()),
         notes: Some("Negative volume".to_string()),
     };

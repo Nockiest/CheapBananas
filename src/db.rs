@@ -36,25 +36,37 @@ pub async fn add_product(pool: &PgPool, product: &Product) -> Result<Uuid, sqlx:
 //
 pub async fn add_product_entry(pool: &PgPool, entry: &ProductEntry) -> Result<Uuid, sqlx::Error> {
     // --- Validation: product_volume must be positive if present ---
-    if let Some(v) = entry.product_volume {
-        if v < 0.0 {
-            return Err(sqlx::Error::Protocol("Product volume must be positive".into()));
+    if let Some(shop_name) = &entry.shop_name {
+        let shops = crate::db::get_shops_filtered(
+            pool,
+            crate::models::ShopFilter {
+                name: Some(shop_name),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+        if let Some(shop) = shops.first() {
+            let row = sqlx::query!(
+                "INSERT INTO product_entries (id, product_id, price, product_volume, unit, shop_name, date, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+                entry.id,
+                entry.product_id,
+                entry.price,
+                entry.product_volume,
+                entry.unit as _,
+                shop.name,
+                entry.date,
+                entry.notes
+            )
+            .fetch_one(pool)
+            .await?;
+            return Ok(row.id);
+        } else {
+            return Err(sqlx::Error::Protocol("Shop not found".into()));
         }
     }
-    let row = sqlx::query!(
-        "INSERT INTO product_entries (id, product_id, price, product_volume, unit, shop_id, date, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
-        entry.id,
-        entry.product_id,
-        entry.price,
-        entry.product_volume,
-        entry.unit as _,
-        entry.shop_id,
-        entry.date,
-        entry.notes
-    )
-    .fetch_one(pool)
-    .await?;
-    Ok(row.id)
+
+    Err(sqlx::Error::Protocol("Shop name is required".into()))
 }
 
 pub async fn delete_product(pool: &PgPool, product_id: Uuid) -> Result<u64, sqlx::Error> {
@@ -129,8 +141,8 @@ pub async fn get_product_entries_filtered(
     if let Some(pid) = filter.product_id {
         builder.push(" AND product_id = ").push_bind(pid);
     }
-    if let Some(shop_id) = filter.shop_id {
-        builder.push(" AND shop_id = ").push_bind(shop_id);
+    if let Some(shop_name) = filter.shop_name {
+        builder.push(" AND shop_name = ").push_bind(shop_name);
     }
     if let Some(min_price) = filter.min_price {
         builder.push(" AND price >= ").push_bind(min_price);

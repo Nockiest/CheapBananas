@@ -4,7 +4,6 @@ use backend::db::*;
 use backend::models::{Product, ProductEntry, Unit, Shop};
 use uuid::Uuid;
 use chrono::Utc;
-cargo check
 mod common;
 use common::setup_db;
 // ...existing code for ProductEntry tests will be inserted here...
@@ -18,7 +17,7 @@ async fn test_add_product_entry() {
         name: "Entry Shop".to_string(),
         notes: None,
     };
-    let shop_id = add_shop(&pool, &shop).await.expect("Failed to add shop");
+    let _shop_id = add_shop(&pool, &shop).await.expect("Failed to add shop");
     // Add a shop and a product first
     let product = Product {
         id: Uuid::new_v4(),
@@ -32,9 +31,9 @@ async fn test_add_product_entry() {
         id: Uuid::new_v4(),
         product_id,
         price: 2.99,
-        product_volume: Some(1.0),
+        product_volume: 1.0,
         unit: Unit::Kg,
-        shop_id: Some(shop_id),
+        shop_name: Some(shop.name.clone()),
         date: Some(Utc::now().naive_utc()),
         notes: Some("Entry for test".to_string()),
     };
@@ -81,9 +80,9 @@ async fn test_get_product_entries_filtered_endpoint() {
         id: Uuid::new_v4(),
         product_id,
         price: 5.0,
-        product_volume: Some(1.0),
+        product_volume: 1.0,
         unit: Unit::Kg,
-        shop_id: Some(shop_id),
+        shop_name: Some(shop.name.clone()),
         date: Some(Utc::now().naive_utc()),
         notes: Some("Fresh batch".to_string()),
     };
@@ -91,9 +90,9 @@ async fn test_get_product_entries_filtered_endpoint() {
         id: Uuid::new_v4(),
         product_id,
         price: 10.0,
-        product_volume: Some(2.0),
+        product_volume:  2.0,
         unit: Unit::Kg,
-        shop_id: Some(shop_id),
+        shop_name: Some(shop.name),
         date: Some(Utc::now().naive_utc()),
         notes: Some("Old batch".to_string()),
     };

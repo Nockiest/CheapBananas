@@ -44,7 +44,6 @@ pub struct ProductEntry {
     pub price: f64,
     pub product_volume:f64,
     pub unit: Unit,
-    pub shop_id: Option<Uuid>,
     pub shop_name: Option<String>, // Added field to include shop name
     pub date: Option<NaiveDateTime>,
     pub notes: Option<String>,
@@ -72,7 +71,7 @@ pub struct ProductFilter<'a> {
     pub max_price: Option<f64>,
     pub product_volume: Option<f64>,
     pub unit: Option<&'a str>,
-    pub shop_id: Option<Uuid>,
+    pub shop_name: Option<String>,
     pub date: Option<chrono::NaiveDateTime>,
 }
 

@@ -294,12 +294,21 @@ pub async fn axum_delete_product_entry(
 ) -> (axum::http::StatusCode, String) {
     match Uuid::parse_str(&id) {
         Ok(uuid) => match db::delete_product_entry(&pool, uuid).await {
-            Ok(affected) if affected > 0 => (200, json!({"deleted": affected}).to_string()),
-            Ok(_) => (404, json!({"error": "Product entry not found"}).to_string()),
-            Err(e) => (500, json!({"error": e.to_string()}).to_string()),
+            Ok(affected) if affected > 0 => (
+                axum::http::StatusCode::OK,
+                json!({"deleted": affected}).to_string(),
+            ),
+            Ok(_) => (
+                axum::http::StatusCode::NOT_FOUND,
+                json!({"error": "Product entry not found"}).to_string(),
+            ),
+            Err(e) => (
+                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+                json!({"error": e.to_string()}).to_string(),
+            ),
         },
         Err(e) => (
-            400,
+            axum::http::StatusCode::BAD_REQUEST,
             json!({"error": format!("Invalid UUID: {}", e)}).to_string(),
         ),
     }
@@ -356,7 +365,7 @@ pub struct ProductFilterQuery {
     pub unit: Option<String>,
     pub min_price: Option<f64>,
     pub max_price: Option<f64>,
-    pub shop_id: Option<Uuid>,
+    pub shop_name: Option<String>,
     pub date: Option<String>,
     pub notes: Option<String>,
     pub tag: Option<String>,
@@ -376,7 +385,7 @@ pub async fn axum_get_products_filtered(
         unit: params.unit.as_deref(),
         min_price: params.min_price,
         max_price: params.max_price,
-        shop_id: params.shop_id,
+        shop_name: params.shop_name,
         date: params
             .date
             .as_deref()
@@ -389,7 +398,7 @@ pub async fn axum_get_products_filtered(
     println!("[DEBUG] Built ProductFilter: {:?}", filter);
     let result = db::get_products_filtered(&pool, filter).await;
     match result {
-        Ok(mut products) => {
+        Ok(products) => {
             // If you want to enrich products with shop info, you need to redesign Product to include shop_id and shop_name fields.
             // For now, just return the products as-is.
             (
@@ -416,7 +425,7 @@ pub async fn axum_get_product_entries_filtered(
         unit: params.unit.as_deref(),
         min_price: params.min_price,
         max_price: params.max_price,
-        shop_id: params.shop_id,
+        shop_name: params.shop_name,
         date: params
             .date
             .as_deref()
@@ -429,26 +438,10 @@ pub async fn axum_get_product_entries_filtered(
     println!("[DEBUG] Built ProductFilter for entries: {:?}", filter);
     let result = db::get_product_entries_filtered(&pool, filter).await;
     match result {
-        Ok(mut entries) => {
-            for entry in &mut entries {
-                if let Some(shop_id) = entry.shop_id {
-                    match db::get_shop_by_id(&pool, shop_id).await {
-                        Ok(Some(shop)) => entry.shop_name = Some(shop.name),
-                        Ok(None) => entry.shop_name = None, // Shop not found
-                        Err(e) => {
-                            return (
-                                axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-                                serde_json::json!({"error": e.to_string()}).to_string(),
-                        );
-                        }
-                    }
-                }
-            }
-            (
-                axum::http::StatusCode::OK,
-                serde_json::to_string(&entries).unwrap(),
-            )
-        }
+        Ok(entries) => (
+            axum::http::StatusCode::OK,
+            serde_json::to_string(&entries).unwrap(),
+        ),
         Err(e) => (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
             serde_json::json!({"error": e.to_string()}).to_string(),
