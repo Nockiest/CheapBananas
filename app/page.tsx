@@ -22,8 +22,19 @@ export default function HomePage() {
 	const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
 	useEffect(() => {
-		setSuggestions(currentMode.fields.map(f => f.suggestions));
-		setActiveSuggestion(Array(currentMode.fields.length).fill(null));
+		// Avoid unnecessary state updates by checking if suggestions or activeSuggestion actually changed
+		const newSuggestions = currentMode.fields.map(f => f.suggestions);
+		const newActiveSuggestion = Array(currentMode.fields.length).fill(null);
+
+		const suggestionsChanged = JSON.stringify(newSuggestions) !== JSON.stringify(suggestions);
+		const activeSuggestionChanged = JSON.stringify(newActiveSuggestion) !== JSON.stringify(activeSuggestion);
+
+		if (suggestionsChanged) {
+			setSuggestions(newSuggestions);
+		}
+		if (activeSuggestionChanged) {
+			setActiveSuggestion(newActiveSuggestion);
+		}
 		setText('');
 		setSuccess(false);
 		setSentEntry(null);
@@ -57,7 +68,7 @@ export default function HomePage() {
 	useEffect(() => {
 		setSuggestions(currentMode.fields.map(f => f.suggestions));
 		setActiveSuggestion(Array(currentMode.fields.length).fill(null));
-	}, [text, mode]);
+	}, [mode]);
 
 	const handleSuggestionClick = (idx: number) => {
 		if (!activeSuggestion[idx]) return;
@@ -74,12 +85,13 @@ export default function HomePage() {
 	let volumeValue = values[volumeIdx];
 
 
-	//let errorText = '';
-	if (text.trim().length > 0 && !allRequiredFilled) {
-		setErrorMsg(`Please fill in all required fields for ${currentMode.label}.`);
-	} 
 
 	const handleSend = async () => {
+
+		if (!allRequiredFilled) {
+			setErrorMsg('Please fill in all required fields');
+			return;
+		}
 		try {
 			let entryValues = [...values];
 			let endpoint = '';
@@ -141,7 +153,7 @@ export default function HomePage() {
 	useEffect(() => {
 		setSuggestions(currentMode.fields.map(f => f.suggestions));
 		setActiveSuggestion(Array(currentMode.fields.length).fill(null));
-	}, [text, mode]);
+	}, [mode]);
 
 
 	return (

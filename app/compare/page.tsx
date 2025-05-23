@@ -29,7 +29,7 @@ const ProductEntriesPage = () => {
       const sortedEntries = entriesResponse.data.sort((a:ProductEntry, b:ProductEntry) => (a.price/a.product_volume) - (b.price/b.product_volume));
       setProductEntries(sortedEntries);
     } catch (err) {
-      setError('Failed to fetch product entries. Please try again later.');
+      setError('Failed to fetch product entries. Please try again later.' + (err as Error).message);
     }
   };
 
@@ -39,6 +39,33 @@ const ProductEntriesPage = () => {
       setProductEntries((prevEntries) => prevEntries.filter((entry) => entry.id !== id));
     } catch (err) {
       setError('Failed to delete product entry. Please try again later.');
+    }
+  };
+
+  const deleteProductAndEntries = async () => {
+    if (!confirm('Are you sure you want to delete this product and all its entries?')) {
+      return;
+    }
+
+    try {
+      setError('');
+      const productResponse = await axios.get(
+        `http://localhost:4000/products/filter?name=${encodeURIComponent(productName)}`
+      );
+
+      if (productResponse.data.length === 0) {
+        setError('No product found with the given name.');
+        return;
+      }
+
+      const productId = productResponse.data[0].id;
+      await axios.delete(`http://localhost:4000/products/${productId}`);
+
+      setProductEntries([]);
+      setProductName('');
+      alert('Product and its entries have been deleted successfully.');
+    } catch (err) {
+      setError('Failed to delete product and its entries. Please try again later.');
     }
   };
 
@@ -77,7 +104,7 @@ const ProductEntriesPage = () => {
                 <td>{entry.shop_name}</td>
                 <td>{entry.price}</td>
                 <td>{entry.notes || 'N/A'}</td>
-                <td>{entry.product_volume || 'N/A'}</td>
+                <td>{entry.product_volume ? `${entry.product_volume}${entry.unit}` : 'N/A'}</td>
                 <td>{(entry.price / (entry.product_volume || 1)).toFixed(2)}</td>
                 <td>
                   <button onClick={() => deleteProductEntry(entry.id)} style={{ padding: '5px 10px', color: 'red' }}>
@@ -89,6 +116,9 @@ const ProductEntriesPage = () => {
           </tbody>
         </table>
       )}
+      <button onClick={deleteProductAndEntries} style={{ cursor: 'pointer', padding: '5px 10px', color: 'red', marginLeft: '10px' }}>
+        Delete Product and Entries
+      </button>
     </div>
   );
 };
